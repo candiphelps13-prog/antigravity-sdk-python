@@ -21,7 +21,7 @@ from google.antigravity.connections.local.litert_connection_config import LiteRT
 from google.antigravity.connections.local.local_connection_config import LocalAgentConfig
 from google.antigravity.connections.local.local_openai_connection_config import LocalOpenAIAgentConfig
 from google.antigravity.tools.tool_context import ToolContext
-from google.antigravity.types import AgentMode
+from google.antigravity.types import AgentBehavior
 from google.antigravity.types import Audio
 from google.antigravity.types import BuiltinTools
 from google.antigravity.types import CapabilitiesConfig
@@ -55,7 +55,7 @@ __all__ = [
     "LiteRTBackend",
     "LocalOpenAIAgentConfig",
     "ToolContext",
-    "AgentMode",
+    "AgentBehavior",
     "Audio",
     "BuiltinTools",
     "CapabilitiesConfig",

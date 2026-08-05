@@ -50,34 +50,34 @@ async with Agent(config=config) as agent:
     pass
 ```
 
-### Agent Execution Mode (`agent_mode`)
+### Agent Execution Behavior (`agent_behavior`)
 
-The SDK supports two operational execution modes via `types.AgentMode`:
+The SDK supports two operational execution behaviors via `types.AgentBehavior`:
 
--   `AgentMode.AUTONOMOUS` (**default**): Non-interactive, automated execution.
+-   `AgentBehavior.AUTONOMOUS` (**default**): Non-interactive, automated execution.
     The agent is incentivized to accomplish the task on its own from start to
     finish.
--   `AgentMode.INTERACTIVE`: Collaborative execution with a human. The agent
+-   `AgentBehavior.INTERACTIVE`: Collaborative execution with a human. The agent
     asks clarifying questions (via `BuiltinTools.ASK_QUESTION`), enables
     interactive planning, and keeps the user in the loop.
 
-Configure `agent_mode` via `CapabilitiesConfig`:
+Configure `agent_behavior` via `CapabilitiesConfig`:
 
 ```python
 from google.antigravity import Agent, LocalAgentConfig, types
 
 config = LocalAgentConfig(
     capabilities=types.CapabilitiesConfig(
-        agent_mode=types.AgentMode.INTERACTIVE,
+        agent_behavior=types.AgentBehavior.INTERACTIVE,
     ),
 )
 async with Agent(config=config) as agent:
-    # Agent will operate in interactive mode, asking questions if needed
+    # Agent will operate with interactive behavior, asking questions if needed
     pass
 ```
 
 > [!NOTE]
-> `agent_mode` defaults to `AgentMode.AUTONOMOUS`. If you enable interactive tools such as `BuiltinTools.ASK_QUESTION` without setting `agent_mode=AgentMode.INTERACTIVE`, a validation warning will be logged.
+> `agent_behavior` defaults to `AgentBehavior.AUTONOMOUS`. If you enable interactive tools such as `BuiltinTools.ASK_QUESTION` without setting `agent_behavior=AgentBehavior.INTERACTIVE`, a validation warning will be logged.
 
 ### Gemini Enterprise Agent Platform (formerly Vertex AI) Configuration
 

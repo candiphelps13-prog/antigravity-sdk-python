@@ -658,12 +658,12 @@ class BuiltinToolsTest(parameterized.TestCase):
     self.assertEqual(types.BuiltinTools.none(), [])
 
 
-class AgentModeTest(unittest.TestCase):
-  """Tests for the AgentMode enum."""
+class AgentBehaviorTest(unittest.TestCase):
+  """Tests for the AgentBehavior enum."""
 
   def test_enum_values(self):
-    self.assertEqual(types.AgentMode.AUTONOMOUS, "autonomous")
-    self.assertEqual(types.AgentMode.INTERACTIVE, "interactive")
+    self.assertEqual(types.AgentBehavior.AUTONOMOUS, "autonomous")
+    self.assertEqual(types.AgentBehavior.INTERACTIVE, "interactive")
 
 
 class CapabilitiesConfigTest(unittest.TestCase):
@@ -673,18 +673,20 @@ class CapabilitiesConfigTest(unittest.TestCase):
     """Verifies defaults: subagents enabled, no tool lists, no threshold."""
     config = types.CapabilitiesConfig()
     self.assertTrue(config.enable_subagents)
-    self.assertEqual(config.agent_mode, types.AgentMode.AUTONOMOUS)
+    self.assertEqual(config.agent_behavior, types.AgentBehavior.AUTONOMOUS)
     self.assertIsNone(config.enabled_tools)
     self.assertIsNone(config.disabled_tools)
     self.assertIsNone(config.compaction_threshold)
     self.assertIsNone(config.finish_tool_schema_json)
 
-  def test_agent_mode_explicit(self):
-    """Verifies that agent_mode can be explicitly set via enum or string."""
-    config = types.CapabilitiesConfig(agent_mode=types.AgentMode.INTERACTIVE)
-    self.assertEqual(config.agent_mode, types.AgentMode.INTERACTIVE)
-    config_str = types.CapabilitiesConfig(agent_mode="interactive")
-    self.assertEqual(config_str.agent_mode, types.AgentMode.INTERACTIVE)
+  def test_agent_behavior_explicit(self):
+    """Verifies that agent_behavior can be explicitly set via enum or string."""
+    config = types.CapabilitiesConfig(
+        agent_behavior=types.AgentBehavior.INTERACTIVE
+    )
+    self.assertEqual(config.agent_behavior, types.AgentBehavior.INTERACTIVE)
+    config_str = types.CapabilitiesConfig(agent_behavior="interactive")
+    self.assertEqual(config_str.agent_behavior, types.AgentBehavior.INTERACTIVE)
 
   def test_enabled_tools(self):
     """Verifies that enabled_tools accepts a list of BuiltinTools."""
@@ -722,7 +724,7 @@ class CapabilitiesConfigTest(unittest.TestCase):
     with self.assertLogs(level="WARNING") as log_cm:
       types.CapabilitiesConfig(
           enabled_tools=[types.BuiltinTools.ASK_QUESTION],
-          agent_mode=types.AgentMode.AUTONOMOUS,
+          agent_behavior=types.AgentBehavior.AUTONOMOUS,
       )
     self.assertTrue(
         any("ASK_QUESTION is enabled" in msg for msg in log_cm.output)
@@ -733,7 +735,7 @@ class CapabilitiesConfigTest(unittest.TestCase):
     with mock.patch("logging.warning") as mock_warn:
       types.CapabilitiesConfig(
           enabled_tools=[types.BuiltinTools.ASK_QUESTION],
-          agent_mode=types.AgentMode.INTERACTIVE,
+          agent_behavior=types.AgentBehavior.INTERACTIVE,
       )
       mock_warn.assert_not_called()
 
@@ -742,7 +744,7 @@ class CapabilitiesConfigTest(unittest.TestCase):
     with self.assertLogs(level="WARNING") as log_cm:
       types.SubagentCapabilities(
           enabled_tools=[types.BuiltinTools.ASK_QUESTION],
-          agent_mode=types.AgentMode.AUTONOMOUS,
+          agent_behavior=types.AgentBehavior.AUTONOMOUS,
       )
     self.assertTrue(
         any(
@@ -1697,15 +1699,17 @@ class SubagentCapabilitiesTest(unittest.TestCase):
 
   def test_defaults(self):
     sc = types.SubagentCapabilities()
-    self.assertEqual(sc.agent_mode, types.AgentMode.AUTONOMOUS)
+    self.assertEqual(sc.agent_behavior, types.AgentBehavior.AUTONOMOUS)
     self.assertIsNone(sc.enabled_tools)
     self.assertIsNone(sc.disabled_tools)
 
-  def test_agent_mode_explicit(self):
-    sc = types.SubagentCapabilities(agent_mode=types.AgentMode.INTERACTIVE)
-    self.assertEqual(sc.agent_mode, types.AgentMode.INTERACTIVE)
-    sc_str = types.SubagentCapabilities(agent_mode="interactive")
-    self.assertEqual(sc_str.agent_mode, types.AgentMode.INTERACTIVE)
+  def test_agent_behavior_explicit(self):
+    sc = types.SubagentCapabilities(
+        agent_behavior=types.AgentBehavior.INTERACTIVE
+    )
+    self.assertEqual(sc.agent_behavior, types.AgentBehavior.INTERACTIVE)
+    sc_str = types.SubagentCapabilities(agent_behavior="interactive")
+    self.assertEqual(sc_str.agent_behavior, types.AgentBehavior.INTERACTIVE)
 
   def test_mutually_exclusive_ok_enabled(self):
     sc = types.SubagentCapabilities(

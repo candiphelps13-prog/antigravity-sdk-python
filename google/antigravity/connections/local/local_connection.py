@@ -73,18 +73,22 @@ def to_proto_session_continuation_mode(
   return localharness_pb2.HarnessConfig.SESSION_CONTINUATION_MODE_UNSPECIFIED
 
 
-_AGENT_MODE_MAP = {
-    types.AgentMode.AUTONOMOUS: localharness_pb2.AGENT_MODE_AUTONOMOUS,
-    types.AgentMode.INTERACTIVE: localharness_pb2.AGENT_MODE_INTERACTIVE,
+_AGENT_BEHAVIOR_MAP = {
+    types.AgentBehavior.AUTONOMOUS: (
+        localharness_pb2.AGENT_BEHAVIOR_AUTONOMOUS
+    ),
+    types.AgentBehavior.INTERACTIVE: (
+        localharness_pb2.AGENT_BEHAVIOR_INTERACTIVE
+    ),
 }
 
 
-def to_proto_agent_mode(
-    mode: types.AgentMode | None,
-) -> localharness_pb2.AgentMode:
-  if mode is not None and mode in _AGENT_MODE_MAP:
-    return _AGENT_MODE_MAP[mode]
-  return localharness_pb2.AGENT_MODE_AUTONOMOUS
+def to_proto_agent_behavior(
+    behavior: types.AgentBehavior | None,
+) -> localharness_pb2.AgentBehavior:
+  if behavior is not None and behavior in _AGENT_BEHAVIOR_MAP:
+    return _AGENT_BEHAVIOR_MAP[behavior]
+  return localharness_pb2.AGENT_BEHAVIOR_AUTONOMOUS
 
 
 def to_proto_model_type(
@@ -959,7 +963,9 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
                   capabilities, is_subagent=True
               ),
               tools=resolved_subagent_tools,
-              agent_mode=to_proto_agent_mode(capabilities.agent_mode),
+              agent_behavior=to_proto_agent_behavior(
+                  capabilities.agent_behavior
+              ),
           )
       )
     return custom_agents_protos
@@ -1028,7 +1034,9 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
         mcp_servers=mcp_server_protos,
         enabled_hooks=enabled_hooks,
         custom_subagents=custom_agents_protos,
-        agent_mode=to_proto_agent_mode(self._capabilities_config.agent_mode),
+        agent_behavior=to_proto_agent_behavior(
+            self._capabilities_config.agent_behavior
+        ),
     )
     if self._retry_config:
       retry_proto = build_retry_config_proto(self._retry_config)

@@ -56,7 +56,7 @@ __all__ = [
     "SystemInstructions",
     "SubagentConfig",
     "SubagentCapabilities",
-    "AgentMode",
+    "AgentBehavior",
     "BuiltinTools",
     "CapabilitiesConfig",
     "ModelAPIRetryConfig",
@@ -148,8 +148,8 @@ class TemplatedSystemInstructions(pydantic.BaseModel):
 SystemInstructions = CustomSystemInstructions | TemplatedSystemInstructions
 
 
-class AgentMode(str, enum.Enum):
-  """Operational execution mode for an agent.
+class AgentBehavior(str, enum.Enum):
+  """Operational execution behavior for an agent.
 
   Attributes:
     AUTONOMOUS: Non-interactive, automated execution. The agent must accomplish
@@ -167,18 +167,19 @@ class SubagentCapabilities(pydantic.BaseModel):
   """Capabilities configuration for subagents.
 
   Attributes:
-    agent_mode: Operational execution mode for the subagent. In particular,
-      AgentMode.AUTONOMOUS incentivizes the agent to solve the task on their
-      own from start to finish while AgentMode.INTERACTIVE makes the agent work
-      collaboratively with a human, asking for clarifications and keeping
-      them in the loop if needed. Defaults to AgentMode.AUTONOMOUS.
+    agent_behavior: Operational execution behavior for the subagent. In
+      particular, AgentBehavior.AUTONOMOUS incentivizes the agent to solve the
+      task on their own from start to finish while AgentBehavior.INTERACTIVE
+      makes the agent work collaboratively with a human, asking for
+      clarifications and keeping them in the loop if needed. Defaults to
+      AgentBehavior.AUTONOMOUS.
     enabled_tools: Explicit allowlist of builtin tools to enable. Mutually
       exclusive with disabled_tools. When None, the harness defaults are used.
     disabled_tools: Explicit denylist of builtin tools to disable. Mutually
       exclusive with enabled_tools. When None, the harness defaults are used.
   """
 
-  agent_mode: AgentMode = AgentMode.AUTONOMOUS
+  agent_behavior: AgentBehavior = AgentBehavior.AUTONOMOUS
   enabled_tools: list[BuiltinTools] | None = None
   disabled_tools: list[BuiltinTools] | None = None
 
@@ -195,12 +196,12 @@ class SubagentCapabilities(pydantic.BaseModel):
     if (
         self.enabled_tools is not None
         and BuiltinTools.ASK_QUESTION in self.enabled_tools
-        and self.agent_mode != AgentMode.INTERACTIVE
+        and self.agent_behavior != AgentBehavior.INTERACTIVE
     ):
       logging.warning(
-          "BuiltinTools.ASK_QUESTION is enabled on subagent, but agent_mode is"
-          " not INTERACTIVE. Set"
-          " SubagentCapabilities(agent_mode=AgentMode.INTERACTIVE) if"
+          "BuiltinTools.ASK_QUESTION is enabled on subagent, but"
+          " agent_behavior is not INTERACTIVE. Set"
+          " SubagentCapabilities(agent_behavior=AgentBehavior.INTERACTIVE) if"
           " interactive question-and-answer behavior is desired."
       )
     return self
@@ -363,11 +364,12 @@ class CapabilitiesConfig(pydantic.BaseModel):
 
   Attributes:
     enable_subagents: Whether the agent can spawn and delegate to sub-agents.
-    agent_mode: Operational execution mode for the agent. In particular,
-      AgentMode.AUTONOMOUS incentivizes the agent to solve the task on their
-      own from start to finish while AgentMode.INTERACTIVE makes the agent work
-      collaboratively with a human, asking for clarifications and keeping
-      them in the loop if needed. Defaults to AgentMode.AUTONOMOUS.
+    agent_behavior: Operational execution behavior for the agent. In
+      particular, AgentBehavior.AUTONOMOUS incentivizes the agent to solve the
+      task on their own from start to finish while AgentBehavior.INTERACTIVE
+      makes the agent work collaboratively with a human, asking for
+      clarifications and keeping them in the loop if needed. Defaults to
+      AgentBehavior.AUTONOMOUS.
     enabled_tools: Explicit allowlist of builtin tools to enable. Mutually
       exclusive with disabled_tools. When None, the harness defaults are used
       (all tools enabled). Disabled tools are removed from the model's context,
@@ -382,7 +384,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
   """
 
   enable_subagents: bool = True
-  agent_mode: AgentMode = AgentMode.AUTONOMOUS
+  agent_behavior: AgentBehavior = AgentBehavior.AUTONOMOUS
   enabled_tools: list[BuiltinTools] | None = None
   disabled_tools: list[BuiltinTools] | None = None
   compaction_threshold: int | None = None
@@ -401,13 +403,13 @@ class CapabilitiesConfig(pydantic.BaseModel):
     if (
         self.enabled_tools is not None
         and BuiltinTools.ASK_QUESTION in self.enabled_tools
-        and self.agent_mode != AgentMode.INTERACTIVE
+        and self.agent_behavior != AgentBehavior.INTERACTIVE
     ):
       logging.warning(
-          "BuiltinTools.ASK_QUESTION is enabled, but agent_mode is not"
+          "BuiltinTools.ASK_QUESTION is enabled, but agent_behavior is not"
           " INTERACTIVE. Set"
-          " CapabilitiesConfig(agent_mode=AgentMode.INTERACTIVE) if interactive"
-          " question-and-answer behavior is desired."
+          " CapabilitiesConfig(agent_behavior=AgentBehavior.INTERACTIVE) if"
+          " interactive question-and-answer behavior is desired."
       )
     return self
 

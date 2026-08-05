@@ -46,7 +46,7 @@ relevant information.
     the Google Antigravity SDK (Agent, Conversation, Connection), read
     `references/architecture.md`.
 -   If the user needs to perform advanced agent configuration (e.g., selecting
-    appropriate models, configuring execution mode via `agent_mode`—defaulting
+    appropriate models, configuring execution behavior via `agent_behavior`—defaulting
     to autonomous vs interactive—or configuring connection reliability), or
     understand the critical rules for model identifiers to avoid assumptions,
     read `references/agent_configuration.md`.

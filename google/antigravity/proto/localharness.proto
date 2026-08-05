@@ -28,10 +28,10 @@ enum LifecycleHook {
   LIFECYCLE_HOOK_POST_TOOL = 6;
   LIFECYCLE_HOOK_ON_TOOL_ERROR = 7;
 }
-enum AgentMode {
-  AGENT_MODE_UNSPECIFIED = 0;
-  AGENT_MODE_AUTONOMOUS = 1;
-  AGENT_MODE_INTERACTIVE = 2;
+enum AgentBehavior {
+  AGENT_BEHAVIOR_UNSPECIFIED = 0;
+  AGENT_BEHAVIOR_AUTONOMOUS = 1;
+  AGENT_BEHAVIOR_INTERACTIVE = 2;
 }
 enum ModelType {
   MODEL_TYPE_UNSPECIFIED = 0;
@@ -93,7 +93,7 @@ message HarnessConfig {
   .antigravity.localharness.ToolOutputTruncation tool_output_truncation = 18;
   .antigravity.localharness.RetryConfig retry_config = 20;
   .antigravity.localharness.PolicyConfig policy_config = 21;
-  .antigravity.localharness.AgentMode agent_mode = 22;
+  .antigravity.localharness.AgentBehavior agent_behavior = 22;
   extensions 1000 to 1999;
   extensions 2000 to max;
 }
@@ -670,7 +670,7 @@ message CustomAgent {
   .antigravity.localharness.HarnessSideTools harness_side_tools = 4;
   repeated .antigravity.localharness.Tool tools = 5;
   .antigravity.localharness.SubagentSkillsConfig skills_config = 6;
-  .antigravity.localharness.AgentMode agent_mode = 7;
+  .antigravity.localharness.AgentBehavior agent_behavior = 7;
 }
 message ToolOutputTruncation {
   message TruncateStrategy {

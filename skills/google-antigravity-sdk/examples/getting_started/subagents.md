@@ -33,10 +33,10 @@ The result from the subagent is typically delivered back to the main agent,
 which then presents it or uses it. The `await response.text()` call will return
 the final aggregated response, including the output produced by the subagent.
 
-## Configuring Subagent Capabilities and Mode
+## Configuring Subagent Capabilities and Behavior
 
-Subagents default to `agent_mode=AgentMode.AUTONOMOUS`. You can declare custom
-subagents and customize their capabilities and execution mode via
+Subagents default to `agent_behavior=AgentBehavior.AUTONOMOUS`. You can declare
+custom subagents and customize their capabilities and execution behavior via
 `SubagentConfig` and `SubagentCapabilities`:
 
 ```python
@@ -48,7 +48,7 @@ config = LocalAgentConfig(
             name="researcher",
             description="Researches topics autonomously.",
             capabilities=types.SubagentCapabilities(
-                agent_mode=types.AgentMode.AUTONOMOUS,
+                agent_behavior=types.AgentBehavior.AUTONOMOUS,
             ),
         ),
     ],
