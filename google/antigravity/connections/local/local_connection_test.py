@@ -1171,12 +1171,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.patcher = mock.patch(
-        "google.antigravity.connections.local.local_connection._get_default_binary_path",
-        return_value="/fake/binary",
-    )
-    self.patcher.start()
-    self.addCleanup(self.patcher.stop)
+    test_utils.patch_default_binary_path(self)
 
   def _make_strategy(self, **kwargs):
     """Creates a LocalConnectionStrategy with the given kwargs."""
@@ -2168,12 +2163,7 @@ class LocalConnectionStrategyApiKeyTest(unittest.IsolatedAsyncioTestCase):
 
   def setUp(self):
     super().setUp()
-    self.patcher = mock.patch(
-        "google.antigravity.connections.local.local_connection._get_default_binary_path",
-        return_value="/fake/binary",
-    )
-    self.patcher.start()
-    self.addCleanup(self.patcher.stop)
+    test_utils.patch_default_binary_path(self)
 
   def _make_strategy(self, **kwargs):
     """Creates a LocalConnectionStrategy with the given kwargs."""
@@ -2455,12 +2445,7 @@ class LocalConnectionStrategyConnectTest(unittest.IsolatedAsyncioTestCase):
 
   def setUp(self):
     super().setUp()
-    self.patcher = mock.patch(
-        "google.antigravity.connections.local.local_connection._get_default_binary_path",
-        return_value="/fake/binary",
-    )
-    self.patcher.start()
-    self.addCleanup(self.patcher.stop)
+    test_utils.patch_default_binary_path(self)
 
   def _make_strategy(self, **kwargs):
     return local_connection.LocalConnectionStrategy(**kwargs)
@@ -3679,6 +3664,10 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
 
 class LocalAgentConfigTest(absltest.TestCase):
 
+  def setUp(self):
+    super().setUp()
+    test_utils.patch_default_binary_path(self)
+
   def test_create_strategy(self):
     config = local_connection_config.LocalAgentConfig(
         system_instructions="test instructions",
@@ -4243,6 +4232,7 @@ class LocalConnectionSubagentsTest(unittest.IsolatedAsyncioTestCase):
 
   def setUp(self):
     super().setUp()
+    test_utils.patch_default_binary_path(self)
     self.temp_dir = self.enterContext(tempfile.TemporaryDirectory())
     self.workspace = pathlib.Path(self.temp_dir) / "workspace"
     self.workspace.mkdir()
@@ -4250,11 +4240,9 @@ class LocalConnectionSubagentsTest(unittest.IsolatedAsyncioTestCase):
   def test_builds_subagents_proto_correctly(self):
     def my_custom_tool():
       """A test tool."""
-      pass
 
     def another_one():
       """Another test tool."""
-      pass
 
     subagent = types.SubagentConfig(
         name="test_helper",
@@ -4383,7 +4371,6 @@ class LocalConnectionSubagentsTest(unittest.IsolatedAsyncioTestCase):
   def test_subagent_tool_not_registered_raises(self):
     def unregistered_tool():
       """Not added to parent."""
-      pass
 
     subagent = types.SubagentConfig(
         name="test_helper",

@@ -21,9 +21,14 @@ from google.antigravity.proto import localharness_pb2
 from google.antigravity import types
 from google.antigravity.connections.local import local_openai_connection
 from google.antigravity.connections.local import local_openai_connection_config
+from google.antigravity.connections.local import test_utils
 
 
 class LocalOpenAIConnectionTest(unittest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    test_utils.patch_default_binary_path(self)
 
   def test_local_openai_strategy_harness_config(self):
     """Verify generic external OpenAI configuration works and clears Gemini config."""

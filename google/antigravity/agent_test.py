@@ -745,7 +745,7 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
     mock_exit_stack.__aexit__.assert_called_once_with(ValueError, exc, None)
 
 
-class AgentConfigTest(unittest.TestCase):
+class AgentConfigTest(unittest.IsolatedAsyncioTestCase):
   """Tests for AgentConfig sugar, conflict guards, and defensive copy."""
 
   def test_sugar_model_flows_to_models(self):

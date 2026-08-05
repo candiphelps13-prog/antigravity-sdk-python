@@ -29,6 +29,7 @@ from collections.abc import Mapping
 import os
 import pathlib
 import sys
+import tempfile
 from typing import Any
 import unittest
 
@@ -836,7 +837,8 @@ class PolicyPathScopingDirectTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     # Symmetrically resolve base directory using standard buildenv temp dirs
-    self.temp_dir_path = pathlib.Path(self.create_tempdir().full_path).resolve()
+    self.temp_dir = self.enterContext(tempfile.TemporaryDirectory())
+    self.temp_dir_path = pathlib.Path(self.temp_dir).resolve()
 
   def test_secure_normalize_path_resolves_existing_symlinks(self):
     """_secure_normalize_path must follow and resolve existing symlinks."""

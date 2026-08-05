@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 
 from google.antigravity.proto import localharness_pb2
+from google.antigravity.connections.local import local_connection
 from google.antigravity.connections.local import test_utils
 from google.antigravity.tools import tool_runner
 
@@ -146,6 +147,17 @@ class TestLocalHarnessTest(unittest.IsolatedAsyncioTestCase):
     self.assertIn("toolConfirmationRequest", step_update)
     self.assertIn("viewFile", step_update)
     self.assertEqual(step_update["viewFile"]["filePath"], "/foo")
+
+
+class PatchDefaultBinaryPathTest(unittest.TestCase):
+
+  def test_patches_binary_path_during_test(self):
+    test_utils.patch_default_binary_path(
+        self, return_value="/custom/test/binary"
+    )
+    self.assertEqual(
+        local_connection._get_default_binary_path(), "/custom/test/binary"
+    )
 
 
 if __name__ == "__main__":
