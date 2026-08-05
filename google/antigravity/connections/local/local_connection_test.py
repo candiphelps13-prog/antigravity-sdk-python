@@ -185,7 +185,7 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
 
     await harness.conn.send("Hello")
     init_data = await harness.wait_for_response()
-    self.assertEqual(init_data.get("userInput"), "Hello")
+    self.assertEqual(init_data.get("userInput"), {"parts": [{"text": "Hello"}]})
 
     # Set the cascade ID and send the 429 error step.
     event1 = localharness_pb2.OutputEvent(
@@ -231,7 +231,7 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
 
     await harness.conn.send("Hello")
     init_data = await harness.wait_for_response()
-    self.assertEqual(init_data.get("userInput"), "Hello")
+    self.assertEqual(init_data.get("userInput"), {"parts": [{"text": "Hello"}]})
 
     # Set the cascade ID.
     event1 = localharness_pb2.OutputEvent(
@@ -272,7 +272,7 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
 
     await harness.conn.send("Hello")
     init_data = await harness.wait_for_response()
-    self.assertEqual(init_data.get("userInput"), "Hello")
+    self.assertEqual(init_data.get("userInput"), {"parts": [{"text": "Hello"}]})
 
     # Send an error indicating MCP failure.
     event = localharness_pb2.OutputEvent(
@@ -298,7 +298,7 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
 
     await harness.conn.send("Hello")
     init_data = await harness.wait_for_response()
-    self.assertEqual(init_data.get("userInput"), "Hello")
+    self.assertEqual(init_data.get("userInput"), {"parts": [{"text": "Hello"}]})
 
     # 1. Harness sends STATE_IDLE (e.g. while processing tool call)
     event1 = localharness_pb2.OutputEvent(
@@ -933,7 +933,7 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
     # Start the turn
     await harness.conn.send("Hello")
     init_data = await harness.wait_for_response()
-    self.assertEqual(init_data.get("userInput"), "Hello")
+    self.assertEqual(init_data.get("userInput"), {"parts": [{"text": "Hello"}]})
 
     # Simulate an active generation step from the harness
     event1 = localharness_pb2.OutputEvent(
@@ -3505,11 +3505,13 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
     await harness.conn.send("Standard text prompt")
 
     sent_data = await harness.wait_for_response()
-    self.assertEqual(sent_data.get("userInput"), "Standard text prompt")
-    self.assertNotIn("complexUserInput", sent_data)
+    self.assertIn("userInput", sent_data)
+    parts = sent_data["userInput"]["parts"]
+    self.assertEqual(len(parts), 1)
+    self.assertEqual(parts[0]["text"], "Standard text prompt")
 
   async def test_send_none_prompt_populates_blank_string(self):
-    """Verifies that passing a prompt of None maps to a blank userInput string frame."""
+    """Verifies that passing a prompt of None maps to a blank userInput text part."""
     harness = test_utils.TestLocalHarness(
         test_case=self,
         process=self.mock_process,
@@ -3518,12 +3520,13 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
 
     sent_data = await harness.wait_for_response()
 
-    # Assert it sets userInput to a blank string and does not use complex inputs
-    self.assertEqual(sent_data.get("userInput"), "")
-    self.assertNotIn("complexUserInput", sent_data)
+    self.assertIn("userInput", sent_data)
+    parts = sent_data["userInput"]["parts"]
+    self.assertEqual(len(parts), 1)
+    self.assertEqual(parts[0].get("text", ""), "")
 
-  async def test_send_single_media_content_populates_complex_user_input(self):
-    """Verifies that a single rich Content primitive maps to the complex_user_input parts list."""
+  async def test_send_single_media_content_populates_user_input(self):
+    """Verifies that a single rich Content primitive maps to the user_input parts list."""
     harness = test_utils.TestLocalHarness(
         test_case=self,
         process=self.mock_process,
@@ -3537,10 +3540,9 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
 
     sent_data = await harness.wait_for_response()
 
-    self.assertNotIn("userInput", sent_data)
-    self.assertIn("complexUserInput", sent_data)
+    self.assertIn("userInput", sent_data)
 
-    parts = sent_data["complexUserInput"]["parts"]
+    parts = sent_data["userInput"]["parts"]
     self.assertEqual(len(parts), 1)
     self.assertIn("media", parts[0])
     media = parts[0]["media"]
@@ -3563,10 +3565,9 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
 
     sent_data = await harness.wait_for_response()
 
-    self.assertNotIn("userInput", sent_data)
-    self.assertIn("complexUserInput", sent_data)
+    self.assertIn("userInput", sent_data)
 
-    parts = sent_data["complexUserInput"]["parts"]
+    parts = sent_data["userInput"]["parts"]
     self.assertEqual(len(parts), 2)
 
     self.assertEqual(parts[0]["text"], "Context text instruction.")
@@ -3574,8 +3575,8 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
     self.assertEqual(parts[1]["media"]["mimeType"], "application/pdf")
     self.assertEqual(parts[1]["media"]["data"], "ZmFrZV9wZGY=")  # b"fake_pdf"
 
-  async def test_send_slash_command_populates_complex_user_input(self):
-    """Verifies that a SlashCommand primitive maps to complex_user_input slash_command field."""
+  async def test_send_slash_command_populates_user_input(self):
+    """Verifies that a SlashCommand primitive maps to user_input slash_command field."""
     harness = test_utils.TestLocalHarness(
         test_case=self,
         process=self.mock_process,
@@ -3587,10 +3588,9 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
 
     sent_data = await harness.wait_for_response()
 
-    self.assertNotIn("userInput", sent_data)
-    self.assertIn("complexUserInput", sent_data)
+    self.assertIn("userInput", sent_data)
 
-    parts = sent_data["complexUserInput"]["parts"]
+    parts = sent_data["userInput"]["parts"]
     self.assertEqual(len(parts), 1)
     self.assertIn("slashCommand", parts[0])
     sc = parts[0]["slashCommand"]
@@ -3654,7 +3654,9 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
     # Start a turn so the connection is non-idle.
     await harness.conn.send("initial prompt")
     initial_msg = await harness.wait_for_response()
-    self.assertEqual(initial_msg.get("userInput"), "initial prompt")
+    self.assertEqual(
+        initial_msg.get("userInput"), {"parts": [{"text": "initial prompt"}]}
+    )
 
     # send_trigger_notification should succeed even though we are mid-turn.
     await harness.conn.send_trigger_notification("trigger content")
@@ -3665,7 +3667,10 @@ class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
     # A regular send() should also succeed (no send-side guard).
     await harness.conn.send("follow-up prompt")
     followup_msg = await harness.wait_for_response()
-    self.assertEqual(followup_msg.get("userInput"), "follow-up prompt")
+    self.assertEqual(
+        followup_msg.get("userInput"),
+        {"parts": [{"text": "follow-up prompt"}]},
+    )
 
 
 class LocalAgentConfigTest(absltest.TestCase):

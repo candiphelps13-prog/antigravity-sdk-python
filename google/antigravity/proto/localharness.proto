@@ -436,8 +436,7 @@ message MultipleChoice {
 }
 message InputEvent {
   oneof event {
-    string user_input = 1;
-    .antigravity.localharness.UserInput complex_user_input = 7;
+    .antigravity.localharness.UserInput user_input = 7;
     .antigravity.localharness.ToolConfirmation tool_confirmation = 2;
     .antigravity.localharness.ToolResponse tool_response = 3;
     .antigravity.localharness.UserQuestionsResponse question_response = 4;

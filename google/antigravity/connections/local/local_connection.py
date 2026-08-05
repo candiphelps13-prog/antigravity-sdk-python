@@ -337,20 +337,17 @@ class LocalConnection(connection.Connection):
     self._processor.reset_for_turn()
 
     if prompt is None:
-      event = localharness_pb2.InputEvent(user_input="")
-    elif isinstance(prompt, str):
-      event = localharness_pb2.InputEvent(user_input=prompt)
+      content_list = [""]
+    elif isinstance(prompt, collections.abc.Sequence) and not isinstance(
+        prompt, (str, bytes)
+    ):
+      content_list = prompt
     else:
-      if isinstance(prompt, collections.abc.Sequence) and not isinstance(
-          prompt, (str, bytes)
-      ):
-        content_list = prompt
-      else:
-        content_list = [prompt]
-      user_input_pb = localharness_pb2.UserInput(
-          parts=[to_proto_input_content(c) for c in content_list]
-      )
-      event = localharness_pb2.InputEvent(complex_user_input=user_input_pb)
+      content_list = [prompt]
+    user_input_pb = localharness_pb2.UserInput(
+        parts=[to_proto_input_content(c) for c in content_list]
+    )
+    event = localharness_pb2.InputEvent(user_input=user_input_pb)
 
     await self._send_input_event(event)
 
