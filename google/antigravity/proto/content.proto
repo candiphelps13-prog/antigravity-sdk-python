@@ -79,6 +79,8 @@ message ImageContent {
     bytes data = 2;
     string uri = 6;
   }
+  .genai.ImageContent.MimeType mime_type = 1
+      [json_name = "legacy_mime_type_enum"];
   string mime_type_string = 8;
   .genai.MediaResolution resolution = 5;
 }
@@ -104,6 +106,8 @@ message AudioContent {
     bytes data = 2;
     string uri = 5;
   }
+  .genai.AudioContent.MimeType mime_type = 1
+      [json_name = "legacy_mime_type_enum"];
   string mime_type_string = 11;
   int32 channels = 7;
   int32 sample_rate = 8;
@@ -118,6 +122,8 @@ message DocumentContent {
     bytes data = 2;
     string uri = 5;
   }
+  .genai.DocumentContent.MimeType mime_type = 1
+      [json_name = "legacy_mime_type_enum"];
   string mime_type_string = 6;
 }
 message VideoContent {
@@ -138,6 +144,8 @@ message VideoContent {
     bytes data = 2;
     string uri = 6;
   }
+  .genai.VideoContent.MimeType mime_type = 1
+      [json_name = "legacy_mime_type_enum"];
   string mime_type_string = 8;
   .genai.MediaResolution resolution = 5;
 }
