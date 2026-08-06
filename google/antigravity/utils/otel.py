@@ -332,15 +332,11 @@ class OTelPreToolCallHook(hooks.PreToolCallDecideHook):
 
     # Make the span active in the current task only for custom tools.
     # Built-in tools do not execute user code and do not need to be active.
-    is_builtin = False
-    if isinstance(data.name, types.BuiltinTools):
+    try:
+      types.BuiltinTools(data.name)
       is_builtin = True
-    elif isinstance(data.name, str):
-      try:
-        types.BuiltinTools(data.name)
-        is_builtin = True
-      except ValueError:
-        pass
+    except ValueError:
+      is_builtin = False
 
     if not is_builtin:
       ctx_mgr = trace.use_span(span)
