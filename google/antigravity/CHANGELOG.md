@@ -15,12 +15,24 @@ The 0.1.10 release introduces support for Gemini Prioritized Inference service t
 
 - **Gemini Prioritized Inference Service Tier**: Configure agents to utilize Gemini Prioritized Inference service tiers for high-priority model execution with automated graceful fallback.
   ```python
-  from google.antigravity import GeminiAPIEndpoint, LocalAgentConfig, types
+  from google.antigravity import (
+      GeminiAPIEndpoint,
+      GeminiModelOptions,
+      LocalAgentConfig,
+      ModelTarget,
+      types,
+  )
 
   # Configure priority inference via GeminiAPIEndpoint
-  options = types.GeminiModelOptions(service_tier=types.ServiceTier.PRIORITY)
-  endpoint = GeminiAPIEndpoint(options=options)
-  config = LocalAgentConfig(endpoint=endpoint)
+  model_opts = GeminiModelOptions(
+      service_tier=types.ServiceTier.PRIORITY,
+  )
+  config = LocalAgentConfig(
+      model=ModelTarget(
+          name="gemini-3.6-flash",
+          endpoint=GeminiAPIEndpoint(options=model_opts),
+      ),
+  )
   ```
 
 - **Tool Call ID Correlation in Lifecycle Hooks**: Inspect `call_id` attributes on tool executions, errors, and hooks to correlate multi-step tool invocations across lifecycle callbacks.
@@ -45,7 +57,7 @@ The 0.1.10 release introduces support for Gemini Prioritized Inference service t
 
   @hooks.pre_turn
   async def inspect_prompt(context: HookContext, data: str) -> types.HookResult:
-      context["user_prompt"] = data
+      context.set_state("user_prompt", data)
       return types.HookResult(allow=True)
   ```
 
