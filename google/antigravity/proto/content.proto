@@ -127,6 +127,16 @@ message DocumentContent {
   string mime_type_string = 6;
 }
 message VideoContent {
+  message StaticMediaProcessing {
+    .google.protobuf.Duration start_offset = 1;
+    .google.protobuf.Duration end_offset = 2;
+    double fps = 3;
+  }
+  message MediaProcessing {
+    oneof type {
+      .genai.VideoContent.StaticMediaProcessing static = 2;
+    }
+  }
   enum MimeType {
     TYPE_UNSPECIFIED = 0;
     TYPE_MP4 = 1;
