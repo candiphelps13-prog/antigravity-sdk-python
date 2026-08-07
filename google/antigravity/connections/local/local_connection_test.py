@@ -2223,7 +2223,10 @@ class LocalConnectionStrategyApiKeyTest(unittest.IsolatedAsyncioTestCase):
     with self.assertRaises(types.AntigravityValidationError) as ctx:
       async with strategy:
         pass
-    self.assertIn("project and location must be set", str(ctx.exception))
+    self.assertIn(
+        "either (project and location) or api_key must be set",
+        str(ctx.exception),
+    )
 
   @mock.patch.dict("os.environ", {}, clear=True)
   @mock.patch("subprocess.Popen")
@@ -2300,6 +2303,66 @@ class LocalConnectionStrategyApiKeyTest(unittest.IsolatedAsyncioTestCase):
     ep = types.VertexEndpoint()
     self.assertEqual(ep.project, "env-project")
     self.assertEqual(ep.location, "env-location")
+
+  @mock.patch.dict(
+      "os.environ",
+      {
+          "GOOGLE_CLOUD_PROJECT": "env-project",
+          "GOOGLE_CLOUD_LOCATION": "env-location",
+      },
+      clear=True,
+  )
+  def test_vertex_endpoint_api_key_skips_env_hydration(self):
+    """VertexEndpoint(api_key=...) skips hydrating project and location from env."""
+    ep = types.VertexEndpoint(api_key="express-key")
+    self.assertEqual(ep.api_key, "express-key")
+    self.assertIsNone(ep.project)
+    self.assertIsNone(ep.location)
+    ep.validate_endpoint()
+
+  def test_vertex_endpoint_mutual_exclusivity(self):
+    """VertexEndpoint raises ValueError when both api_key and project/location are set."""
+    ep_both = types.VertexEndpoint(
+        project="my-proj", location="us-central1", api_key="express-key"
+    )
+    with self.assertRaisesRegex(ValueError, "Cannot specify both api_key"):
+      ep_both.validate_endpoint()
+
+    ep_proj = types.VertexEndpoint(project="my-proj", api_key="express-key")
+    with self.assertRaisesRegex(ValueError, "Cannot specify both api_key"):
+      ep_proj.validate_endpoint()
+
+    ep_loc = types.VertexEndpoint(location="us-central1", api_key="express-key")
+    with self.assertRaisesRegex(ValueError, "Cannot specify both api_key"):
+      ep_loc.validate_endpoint()
+
+  @mock.patch.dict("os.environ", {}, clear=True)
+  def test_vertex_shorthand_forwards_api_key(self):
+    """LocalAgentConfig(vertex=True, api_key=...) constructs Express mode VertexEndpoint."""
+    cfg = local_connection_config.LocalAgentConfig(
+        vertex=True, api_key="express-key"
+    )
+    self.assertIsInstance(cfg.models[0].endpoint, types.VertexEndpoint)
+    self.assertEqual(cfg.models[0].endpoint.api_key, "express-key")
+    self.assertIsNone(cfg.models[0].endpoint.project)
+    self.assertIsNone(cfg.models[0].endpoint.location)
+    cfg.models[0].endpoint.validate_endpoint()
+
+  @mock.patch.dict("os.environ", {}, clear=True)
+  def test_vertex_express_config_propagates_to_harness_proto(self):
+    """Verifies that api_key on VertexEndpoint propagates to localharness proto."""
+    models = [
+        types.ModelTarget(
+            name="gemini-3.6-flash",
+            types=[types.ModelType.TEXT],
+            endpoint=types.VertexEndpoint(api_key="express-key"),
+        )
+    ]
+    strategy = self._make_strategy(models=models)
+    config_proto = strategy._build_harness_config()
+    self.assertEqual(
+        config_proto.models[0].vertex_endpoint.api_key, "express-key"
+    )
 
   @mock.patch.dict("os.environ", {"GEMINI_API_KEY": "env-key"}, clear=True)
   @mock.patch("subprocess.Popen")

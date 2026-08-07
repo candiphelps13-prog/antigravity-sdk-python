@@ -209,6 +209,7 @@ class LocalAgentConfig(BaseLocalAgentConfig):
       return types.VertexEndpoint(
           project=self.project,
           location=self.location,
+          api_key=self.api_key,
       )
     return types.GeminiAPIEndpoint(api_key=self.api_key)
 

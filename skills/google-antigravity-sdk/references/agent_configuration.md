@@ -87,19 +87,28 @@ AI) instead of Gemini Developer API:
 ```python
 from google.antigravity import Agent, LocalAgentConfig
 
-config = LocalAgentConfig(
+# 1. Express Mode (API Key) - authenticates against aiplatform.googleapis.com
+express_config = LocalAgentConfig(
+    vertex=True,
+    api_key="your-express-api-key",
+)
+
+# 2. Standard Mode (ADC) - regional routing with project and location
+standard_config = LocalAgentConfig(
     vertex=True,
     project="your-gcp-project",
     location="us-central1",
 )
-async with Agent(config=config) as agent:
-    # Use the agent with Gemini Enterprise Agent Platform
-    pass
+
+async with Agent(config=express_config) as agent:
+  # Use the agent with Gemini Enterprise Agent Platform
+  pass
 ```
 
-Note: Gemini Enterprise Agent Platform authentication relies on Application
-Default Credentials (ADC). Ensure you have run `gcloud auth application-default
-login` in your environment.
+Note: In Standard Mode, Gemini Enterprise Agent Platform authentication relies on
+Application Default Credentials (ADC); ensure you have run
+`gcloud auth application-default login` in your environment. In Express Mode,
+only the `api_key` and `vertex=True` are required.
 
 ### Prioritized Inference (`service_tier="priority"`)
 

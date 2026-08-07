@@ -134,6 +134,7 @@ message VertexEndpoint {
   string project = 3;
   string location = 4;
   .antigravity.localharness.GeminiModelOptions options = 5;
+  string api_key = 6;
 }
 message ModelConfig {
   oneof endpoint {

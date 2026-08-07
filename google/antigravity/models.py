@@ -129,21 +129,38 @@ class VertexEndpoint(ModelEndpoint):
 
   project: str | None = None
   location: str | None = None
+  api_key: str | None = None
   options: GeminiModelOptions | None = None
 
   @pydantic.model_validator(mode="before")
   @classmethod
   def _populate_env_vars(cls, data: Any) -> Any:
     if isinstance(data, dict):
-      if data.get("project") is None:
-        data["project"] = os.environ.get("GOOGLE_CLOUD_PROJECT")
-      if data.get("location") is None:
-        data["location"] = os.environ.get("GOOGLE_CLOUD_LOCATION")
+      if not data.get("api_key"):
+        if data.get("project") is None:
+          data["project"] = os.environ.get("GOOGLE_CLOUD_PROJECT")
+        if data.get("location") is None:
+          data["location"] = os.environ.get("GOOGLE_CLOUD_LOCATION")
     return data
 
   def validate_endpoint(self) -> None:
-    if not (self.project and self.location):
-      raise ValueError("For Vertex AI, a GCP project and location must be set.")
+    if self.base_url:
+      return  # External API, validation is done by the external API.
+
+    has_regional_auth = bool(self.project and self.location)
+    has_any_regional_arg = bool(self.project or self.location)
+    has_express_auth = bool(self.api_key)
+
+    if has_any_regional_arg and has_express_auth:
+      raise ValueError(
+          "Cannot specify both api_key (Express Mode) and project/location"
+          " (Standard Mode) on VertexEndpoint."
+      )
+
+    if not (has_regional_auth or has_express_auth):
+      raise ValueError(
+          "For Vertex AI, either (project and location) or api_key must be set."
+      )
 
 
 class ModelTarget(pydantic.BaseModel):

@@ -173,6 +173,7 @@ def build_models_proto(
           http_headers=m.endpoint.http_headers or {},
           project=m.endpoint.project or "",
           location=m.endpoint.location or "",
+          api_key=m.endpoint.api_key or "",
       )
       if m.endpoint.options and m.endpoint.options.model_dump(
           exclude_none=True

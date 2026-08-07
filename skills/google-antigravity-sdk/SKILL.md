@@ -26,10 +26,14 @@ ready:
         (e.g., `LocalAgentConfig(api_key="...")`) or automatically read from the
         environment.
     -   For Gemini Enterprise Agent Platform (formerly Vertex AI)
-        authentication, the SDK uses Application Default Credentials (ADC).
-        Instruct the user to run `gcloud auth application-default login` and
-        configure the agent with `vertex=True` along with `project` and
-        `location` in `LocalAgentConfig`.
+        authentication, the SDK supports both Standard Mode and Express Mode:
+        -   **Standard Mode (ADC)**: Instruct the user to run
+            `gcloud auth application-default login` and configure the agent with
+            `vertex=True` along with `project` and `location` in
+            `LocalAgentConfig`.
+        -   **Express Mode (API Key)**: Configure the agent with `vertex=True`
+            along with `api_key="your-express-api-key"` in `LocalAgentConfig`
+            (no ADC or regional project/location needed).
     -   **Note**: For local models (`LiteRTAgentConfig` or
         `LocalOpenAIAgentConfig`), no API key or cloud credentials are needed.
         See `references/local_models.md` for setup details.
