@@ -367,10 +367,7 @@ class ToolRunner:
           return types.ToolResult(
               name=tc.name, error=f"Unknown tool: '{tc.name}'"
           )
-        tool_fn = self._tools[tc.name]
-        coerced_args = self._coerce_args(tool_fn, tc.args)
-        injected_args = self._inject_context(tc.name, coerced_args)
-        result = await self._execute_fn(tool_fn, **injected_args)
+        result = await self.execute(tc.name, **tc.args)
         return types.ToolResult(name=tc.name, result=result)
       except Exception as e:  # pylint: disable=broad-except
         return types.ToolResult(
