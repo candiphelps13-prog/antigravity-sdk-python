@@ -69,12 +69,9 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 import dataclasses
 import enum
-import functools
 import inspect
 import logging
 import os
-import pathlib
-import sys
 import typing
 from typing import Any, Union, overload
 
@@ -442,74 +439,6 @@ def confirm_run_command(
 PathOrStr = Union[str, os.PathLike[str]]
 
 
-def _secure_normalize_path(path: PathOrStr) -> pathlib.Path:
-  """Symmetrically canonicalizes paths, resolving symlinks and junctions.
-
-  Raises OSError if the path cannot be securely canonicalized (Fail-Closed).
-  """
-  # We do NOT specify strict=True because new files to be created do not exist yet.
-  # Instead, we use resolve(strict=False) which resolves existing symlinks.
-  # We let OSErrors bubble up so the caller fails closed.
-  return pathlib.Path(path).resolve()
-
-
-@functools.lru_cache(maxsize=256)
-def _is_case_insensitive(path: pathlib.Path) -> bool:
-  """Dynamically checks if the filesystem at the given path is case-insensitive.
-
-  Employs LRU caching to prevent excessive filesystem disk stats.
-  """
-  try:
-    if not path.exists():
-      return sys.platform in ("win32", "darwin")
-  except OSError:
-    return sys.platform in ("win32", "darwin")
-
-  parent = path.parent
-  name = path.name
-  if not name:
-    return sys.platform in ("win32", "darwin")
-
-  # Invert character casing to check if the OS resolves to the same file
-  swapped_name = "".join(c.swapcase() for c in name)
-  if swapped_name == name:
-    # No alphabetic characters in name — recursively probe parent directory
-    if parent and parent != path:
-      return _is_case_insensitive(parent)
-    return sys.platform in ("win32", "darwin")
-
-  try:
-    return path.samefile(parent / swapped_name)
-  except OSError:
-    return False
-
-
-def _is_path_in_workspace(
-    target_path: PathOrStr, workspace_path: PathOrStr
-) -> bool:
-  """Returns True if the canonicalized target_path lies strictly within workspace_path."""
-  try:
-    norm_target = _secure_normalize_path(target_path)
-    norm_ws = _secure_normalize_path(workspace_path)
-  except OSError:
-    # Security Fallback: Fail-closed if normalization fails
-    return False
-
-  if _is_case_insensitive(norm_ws):
-    # Unicode-compliant case folding for robust case-insensitive matching
-    t_parts = [p.casefold() for p in norm_target.parts]
-    w_parts = [p.casefold() for p in norm_ws.parts]
-  else:
-    t_parts = list(norm_target.parts)
-    w_parts = list(norm_ws.parts)
-
-  if len(t_parts) < len(w_parts):
-    return False
-
-  # Structural containment comparison (avoids trailing separator slicing vulnerabilities)
-  return t_parts[: len(w_parts)] == w_parts
-
-
 def workspace_only(workspaces: Sequence[PathOrStr]) -> list[Policy]:
   """Restricts file tools to the given workspace directories.
 
@@ -522,97 +451,14 @@ def workspace_only(workspaces: Sequence[PathOrStr]) -> list[Policy]:
   Returns:
     A list of Policies.
   """
+  del workspaces
   file_tools = [t.value for t in types.BuiltinTools.file_tools()]
-
-  def _outside_workspace(tc: types.ToolCall) -> bool:
-    """Returns True when the target path is outside all workspaces."""
-    path = tc.canonical_path or ""
-    if not path:
-      # Allow omit-path edge cases (e.g. list_dir with no args uses cwd)
-      return False
-
-    return not any(_is_path_in_workspace(path, ws) for ws in workspaces)
-
-  return [
-      deny(tool, when=_outside_workspace, name=_WORKSPACE_ONLY_POLICY_NAME)
-      for tool in file_tools
-  ]
+  return [deny(tool, name=_WORKSPACE_ONLY_POLICY_NAME) for tool in file_tools]
 
 
 # ---------------------------------------------------------------------------
-# Priority bucket indices (lower = higher priority)
+# Dynamic evaluation helpers
 # ---------------------------------------------------------------------------
-
-_LEVEL_SPECIFIC_DENY = 0
-_LEVEL_SPECIFIC_ASK = 1
-_LEVEL_SPECIFIC_ALLOW = 2
-
-_LEVEL_PREFIX_DENY = 3
-_LEVEL_PREFIX_ASK = 4
-_LEVEL_PREFIX_ALLOW = 5
-
-_LEVEL_GLOBAL_DENY = 6
-_LEVEL_GLOBAL_ASK = 7
-_LEVEL_GLOBAL_ALLOW = 8
-
-_NUM_LEVELS = 9
-
-_DECISION_TO_SPECIFIC_LEVEL = {
-    Decision.DENY: _LEVEL_SPECIFIC_DENY,
-    Decision.ASK_USER: _LEVEL_SPECIFIC_ASK,
-    Decision.APPROVE: _LEVEL_SPECIFIC_ALLOW,
-}
-
-_DECISION_TO_PREFIX_LEVEL = {
-    Decision.DENY: _LEVEL_PREFIX_DENY,
-    Decision.ASK_USER: _LEVEL_PREFIX_ASK,
-    Decision.APPROVE: _LEVEL_PREFIX_ALLOW,
-}
-
-_DECISION_TO_GLOBAL_LEVEL = {
-    Decision.DENY: _LEVEL_GLOBAL_DENY,
-    Decision.ASK_USER: _LEVEL_GLOBAL_ASK,
-    Decision.APPROVE: _LEVEL_GLOBAL_ALLOW,
-}
-
-
-def _is_global_wildcard(tool: str) -> bool:
-  return tool == _WILDCARD
-
-
-def _is_prefix_wildcard(tool: str) -> bool:
-  # Prefix wildcards (e.g. "server/*") are strictly supported for MCP tools.
-  return tool.endswith("/*")
-
-
-def _bucket_index(p: Policy) -> int:
-  """Returns the priority bucket for a policy."""
-  if _is_global_wildcard(p.tool):
-    return _DECISION_TO_GLOBAL_LEVEL[p.decision]
-  if _is_prefix_wildcard(p.tool):
-    return _DECISION_TO_PREFIX_LEVEL[p.decision]
-  return _DECISION_TO_SPECIFIC_LEVEL[p.decision]
-
-
-# ---------------------------------------------------------------------------
-# Evaluation helpers
-# ---------------------------------------------------------------------------
-
-
-def _matches_target(policy_tool: str, call_target: str, is_mcp: bool) -> bool:
-  """Matches policy tool definition against parsed call target."""
-  if policy_tool == _WILDCARD:
-    return True
-
-  if is_mcp:
-    # policy_tool can be "server/*" or "server/tool"
-    if _is_prefix_wildcard(policy_tool):
-      policy_server = policy_tool[:-2]
-      call_server, _ = call_target.split("/", 1)
-      return policy_server == call_server
-    return policy_tool == call_target
-
-  return policy_tool == call_target
 
 
 async def _evaluate_predicate(
@@ -664,140 +510,97 @@ async def _evaluate_predicate(
 
 async def _execute_ask_user(policy: Policy, tool_call: types.ToolCall) -> bool:
   """Invokes the policy's ask_user handler, propagating exceptions."""
-  assert policy.ask_user is not None  # Validated at enforce() time.
+  assert policy.ask_user is not None
   result = policy.ask_user(tool_call)
   if inspect.isawaitable(result):
     result = await result
   return bool(result)
 
 
+def _matches_target(policy_tool: str, tool_call: types.ToolCall) -> bool:
+  """Matches a policy tool definition against a tool call target."""
+  if policy_tool == _WILDCARD:
+    return True
+  if tool_call.server_name:
+    if policy_tool.endswith("/*"):
+      return policy_tool[:-2] == tool_call.server_name
+    return policy_tool == f"{tool_call.server_name}/{tool_call.name}"
+  return policy_tool == tool_call.name
+
+
 # ---------------------------------------------------------------------------
-# Hook implementation
+# Hook implementation for in-process policy evaluation
 # ---------------------------------------------------------------------------
 
 
 class _PolicyDecideHook(hooks.PreToolCallDecideHook):
-  """PreToolCallDecideHook that enforces a set of policies.
+  """PreToolCallDecideHook that evaluates dynamic policies in-process."""
 
-  Created by enforce(). Policies are pre-sorted into priority buckets at
-  construction time; evaluation walks buckets high-to-low and short-circuits
-  on the first matching policy.
-  """
-
-  def __init__(
-      self,
-      buckets: Sequence[Sequence[Policy]],
-  ):
-    self._buckets = buckets
-
-  async def _evaluate_policy(
-      self, p: Policy, tool_call: types.ToolCall
-  ) -> hooks.HookResult | None:
-    """Evaluates a single policy against the tool call.
-
-    Args:
-      p: The policy to evaluate.
-      tool_call: The tool call data.
-
-    Returns:
-      A HookResult if the policy matches and a decision is made, or None
-      if the policy does not match. Propagates exceptions during evaluation.
-    """
-    if tool_call.server_name:
-      call_target = f"{tool_call.server_name}/{tool_call.name}"
-      is_mcp = True
-    else:
-      call_target = tool_call.name
-      is_mcp = False
-
-    if not _matches_target(p.tool, call_target, is_mcp):
-      return None
-
-    try:
-      if not await _evaluate_predicate(p, tool_call):
-        return None
-
-      # First match in this bucket wins.
-      return await self._apply(p, tool_call)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-      _logger.error(
-          "Exception during policy %r evaluation — failing closed.",
-          p.name or p.tool,
-          exc_info=True,
-      )
-      return hooks.HookResult(
-          allow=False,
-          message=(
-              f"Policy evaluation failed for policy '{p.name or p.tool}':"
-              f" {repr(e)}"
-          ),
-      )
+  def __init__(self, policies: Sequence[Policy]):
+    self._policies = list(policies)
 
   async def run(
       self, context: hooks.HookContext, data: types.ToolCall
   ) -> hooks.HookResult:
-    """Evaluates policies against the tool call.
-
-    Args:
-      context: The hook context.
-      data: A ToolCall instance.
-
-    Returns:
-      HookResult allowing or denying the tool call.
-    """
+    """Evaluates dynamic policies sequentially against the tool call."""
+    del context
     tool_call = data
-    try:
-      for bucket in self._buckets:
-        for p in bucket:
-          result = await self._evaluate_policy(p, tool_call)
-          if result is not None:
-            return result
-    except Exception as e:  # pylint: disable=broad-exception-caught
-      _logger.error(
-          "Unexpected exception in policy hook — failing closed.",
-          exc_info=True,
-      )
-      return hooks.HookResult(
-          allow=False, message=f"Internal policy error: {repr(e)}"
-      )
+    for p in self._policies:
+      if p.name == _WORKSPACE_ONLY_POLICY_NAME:
+        # Workspace boundary containment is enforced at the platform layer.
+        continue
 
-    # No policy matched — default open.
+      if not _matches_target(p.tool, tool_call):
+        continue
+
+      try:
+        if not await _evaluate_predicate(p, tool_call):
+          continue
+
+        label = p.name or p.tool
+        if p.decision == Decision.DENY:
+          _logger.info("Policy %r denied tool %r.", label, tool_call.name)
+          return hooks.HookResult(
+              allow=False,
+              message=f"Denied by policy '{label}'.",
+          )
+        if p.decision == Decision.APPROVE:
+          _logger.info("Policy %r approved tool %r.", label, tool_call.name)
+          return hooks.HookResult(allow=True)
+        if p.decision == Decision.ASK_USER and p.ask_user is not None:
+          _logger.info(
+              "Policy %r requesting user approval for tool %r.",
+              label,
+              tool_call.name,
+          )
+          approved = await _execute_ask_user(p, tool_call)
+          if approved:
+            return hooks.HookResult(allow=True)
+          return hooks.HookResult(
+              allow=False,
+              message=(
+                  f"User denied tool '{tool_call.name}' (policy '{label}')."
+              ),
+          )
+      except Exception as e:  # pylint: disable=broad-exception-caught
+        _logger.error(
+            "Exception during policy %r evaluation — failing closed.",
+            p.name or p.tool,
+            exc_info=True,
+        )
+        return hooks.HookResult(
+            allow=False,
+            message=(
+                f"Policy evaluation failed for policy '{p.name or p.tool}':"
+                f" {repr(e)}"
+            ),
+        )
+
     return hooks.HookResult(allow=True)
-
-  async def _apply(
-      self, p: Policy, tool_call: types.ToolCall
-  ) -> hooks.HookResult:
-    """Applies the matched policy's decision."""
-    label = p.name or p.tool
-
-    if p.decision == Decision.DENY:
-      _logger.info("Policy %r denied tool %r.", label, tool_call.name)
-      return hooks.HookResult(
-          allow=False,
-          message=f"Denied by policy '{label}'.",
-      )
-
-    if p.decision == Decision.APPROVE:
-      _logger.info("Policy %r approved tool %r.", label, tool_call.name)
-      return hooks.HookResult(allow=True)
-
-    # ASK_USER
-    _logger.info(
-        "Policy %r requesting user approval for tool %r.",
-        label,
-        tool_call.name,
-    )
-    approved = await _execute_ask_user(p, tool_call)
-    if approved:
-      return hooks.HookResult(allow=True)
-    return hooks.HookResult(
-        allow=False,
-        message=f"User denied tool '{tool_call.name}' (policy '{label}').",
-    )
 
 
 # ---------------------------------------------------------------------------
-# Private helpers for hook construction
+# Private helpers for hook construction & proto serialization
 # ---------------------------------------------------------------------------
 
 
@@ -820,7 +623,6 @@ def flatten_policies(
     if isinstance(p, Policy):
       flat.append(p)
     elif isinstance(p, Sequence) and not isinstance(p, (str, bytes)):
-      # Safely verify that all sub-elements are indeed Policy instances
       for sub_p in p:
         if not isinstance(sub_p, Policy):
           raise ValueError(f"Expected Policy, got {type(sub_p)}")
@@ -921,31 +723,36 @@ def _to_policy_config_proto(
 # ---------------------------------------------------------------------------
 
 
+def _policy_sort_key(p: Policy) -> tuple[int, int]:
+  """Returns a sort key ordering specific before wildcards, and DENY before APPROVE."""
+  scope = 2 if p.tool == _WILDCARD else (1 if p.tool.endswith("/*") else 0)
+  decision_order = {
+      Decision.DENY: 0,
+      Decision.ASK_USER: 1,
+      Decision.APPROVE: 2,
+  }
+  return (scope, decision_order.get(p.decision, 3))
+
+
 def enforce(
     policies: Sequence[Policy | Sequence[Policy]],
     *,
     mcp_servers: Sequence[types.BaseMcpServerConfig] | None = None,
 ) -> hooks.PreToolCallDecideHook:
-  """Creates a PreToolCallDecideHook that enforces the given policies.
-
-  Validates policies at construction time:
-  - Every ASK_USER policy must have a handler.
-  - MCP policies must have mcp_servers provided.
-
-  Policies are bucketed by priority so that evaluation can short-circuit.
+  """Creates a PreToolCallDecideHook that evaluates dynamic policies.
 
   Args:
     policies: The policies to enforce (can be nested).
-    mcp_servers: Optional registered MCP server configurations.
+    mcp_servers: Optional registered MCP server configurations (unused; kept for
+      backward compatibility).
 
   Returns:
-    A PreToolCallDecideHook ready for registration with HookRunner.
+    A PreToolCallDecideHook ready for registration.
 
   Raises:
-    ValueError: If any ASK_USER policy is missing a handler, or if MCP
-      policies are used without mcp_servers.
+    ValueError: If any ASK_USER policy is missing a handler.
   """
-  flat_policies = flatten_policies(policies)
+  flat_policies = sorted(flatten_policies(policies), key=_policy_sort_key)
 
   # Validate MCP policies against mcp_servers (Fail-Closed Security Guard)
   has_mcp_policy = any(
@@ -966,9 +773,4 @@ def enforce(
           " handler. Provide one via policy.ask_user(tool, handler=...)."
       )
 
-  # Build priority buckets, preserving registration order within each.
-  buckets: list[list[Policy]] = [[] for _ in range(_NUM_LEVELS)]
-  for p in flat_policies:
-    buckets[_bucket_index(p)].append(p)
-
-  return _PolicyDecideHook(buckets)
+  return _PolicyDecideHook(flat_policies)

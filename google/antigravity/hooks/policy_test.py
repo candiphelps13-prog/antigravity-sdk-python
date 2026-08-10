@@ -26,10 +26,6 @@ Covers:
 """
 
 from collections.abc import Mapping
-import os
-import pathlib
-import sys
-import tempfile
 from typing import Any
 import unittest
 
@@ -94,12 +90,12 @@ class BuilderTest(unittest.TestCase):
     self.assertIs(p.ask_user, handler)
 
   def test_ask_user_without_handler_creates_ask_user_policy(self):
-    """ask_user() without handler produces a Policy with ask_user=None for Hub UI confirmation."""
-    p = policy.ask_user("run_command", name="hub-confirm-cmd")
+    """ask_user() without handler produces a Policy with ask_user=None."""
+    p = policy.ask_user("run_command", name="confirm-cmd")
     self.assertEqual(p.tool, "run_command")
     self.assertEqual(p.decision, policy.Decision.ASK_USER)
     self.assertIsNone(p.ask_user)
-    self.assertEqual(p.name, "hub-confirm-cmd")
+    self.assertEqual(p.name, "confirm-cmd")
 
   def test_ask_user_mcp_server_without_handler(self):
     """ask_user(BaseMcpServerConfig, handler=None) returns list[Policy] with ask_user=None."""
@@ -172,10 +168,10 @@ class ValidationTest(unittest.TestCase):
 
 
 class PriorityEvaluationTest(unittest.IsolatedAsyncioTestCase):
-  """Verifies the 6-level priority evaluation model."""
+  """Verifies precedence ordering in enforce() (specific < prefix < wildcard, DENY < ASK < ALLOW)."""
 
   async def test_specific_deny_overrides_wildcard_allow(self):
-    """Level 1 (specific deny) beats Level 6 (wildcard allow)."""
+    """Specific deny beats wildcard allow."""
     hook = policy.enforce([
         policy.allow("*"),
         policy.deny("dangerous_tool"),
@@ -185,7 +181,7 @@ class PriorityEvaluationTest(unittest.IsolatedAsyncioTestCase):
     self.assertFalse(result.allow)
 
   async def test_specific_deny_overrides_specific_allow(self):
-    """Level 1 (specific deny) beats Level 3 (specific allow)."""
+    """Specific deny beats specific allow."""
     hook = policy.enforce([
         policy.allow("run_command"),
         policy.deny("run_command"),
@@ -195,67 +191,75 @@ class PriorityEvaluationTest(unittest.IsolatedAsyncioTestCase):
     self.assertFalse(result.allow)
 
   async def test_specific_ask_overrides_wildcard_deny(self):
-    """Level 2 (specific ask) beats Level 4 (wildcard deny)."""
+    """Specific ask beats wildcard deny."""
     hook = policy.enforce([
         policy.deny("*"),
         policy.ask_user("run_command", handler=lambda tc: True),
     ])
     ctx = hooks.HookContext()
     result = await hook.run(ctx, _make_tool_call("run_command"))
-    # ask_user handler returns True → approved
     self.assertTrue(result.allow)
 
   async def test_specific_allow_overrides_wildcard_deny(self):
-    """Level 3 (specific allow) beats Level 4 (wildcard deny).
-
-    This is the critical "deny all except X" pattern.
-    """
+    """Specific allow beats wildcard deny."""
     hook = policy.enforce([
         policy.deny("*"),
         policy.allow("read_file"),
     ])
     ctx = hooks.HookContext()
-
     result = await hook.run(ctx, _make_tool_call("read_file"))
     self.assertTrue(result.allow)
-
-    # Other tools should still be denied by the wildcard
     result = await hook.run(ctx, _make_tool_call("run_command"))
     self.assertFalse(result.allow)
 
-  async def test_wildcard_deny_blocks_unmatched_tools(self):
-    """Level 4 (wildcard deny) blocks tools with no specific policy."""
-    hook = policy.enforce([
-        policy.deny("*"),
-    ])
+  async def test_specific_mcp_allow_beats_prefix_mcp_deny(self):
+    """Specific MCP allow (math/calc) beats prefix MCP deny (math/*)."""
+    mcp = types.McpStdioServer(name="math", command="npx")
+    hook = policy.enforce(
+        [
+            policy.allow(mcp, ["calc"]),
+            policy.deny(mcp),
+        ],
+        mcp_servers=[mcp],
+    )
     ctx = hooks.HookContext()
-    result = await hook.run(ctx, _make_tool_call("anything"))
+    result = await hook.run(ctx, _make_tool_call("calc", server_name="math"))
+    self.assertTrue(result.allow)
+    result = await hook.run(
+        ctx, _make_tool_call("multiply", server_name="math")
+    )
     self.assertFalse(result.allow)
 
-  async def test_wildcard_ask_user(self):
-    """Level 5 (wildcard ask) applies to all tools."""
-    hook = policy.enforce([
-        policy.ask_user("*", handler=lambda tc: False),
-    ])
+  async def test_bare_tool_policy_does_not_match_mcp_tool_call(self):
+    """Local tool policy for 'calc' must not match MCP tool call 'math/calc'."""
+    mcp = types.McpStdioServer(name="math", command="npx")
+    hook = policy.enforce(
+        [
+            policy.allow("calc"),  # Local tool only
+            policy.deny(mcp),  # math/*
+        ],
+        mcp_servers=[mcp],
+    )
     ctx = hooks.HookContext()
-    result = await hook.run(ctx, _make_tool_call("any_tool"))
+    # math/calc must be denied by deny(math/*), not allowed by allow("calc")
+    result = await hook.run(ctx, _make_tool_call("calc", server_name="math"))
     self.assertFalse(result.allow)
 
-  async def test_wildcard_allow(self):
-    """Level 6 (wildcard allow) allows all tools."""
-    hook = policy.enforce([
-        policy.allow("*"),
-    ])
+  async def test_workspace_only_skipped_in_process(self):
+    """workspace_only() policies are skipped by _PolicyDecideHook."""
+    policies = policy.workspace_only(["/tmp/workspace"])
+    hook = policy.enforce(policies)
     ctx = hooks.HookContext()
-    result = await hook.run(ctx, _make_tool_call("any_tool"))
+    # Should be allowed by default (boundary checks handled by platform)
+    result = await hook.run(ctx, _make_tool_call("view_file", path="/any/path"))
     self.assertTrue(result.allow)
 
 
 class ShortCircuitTest(unittest.IsolatedAsyncioTestCase):
-  """Verifies first-match-wins within a priority group."""
+  """Verifies first-match-wins and predicate short-circuiting."""
 
-  async def test_first_match_wins_within_deny_group(self):
-    """When two specific deny policies match, only the first is evaluated."""
+  async def test_first_match_wins_within_same_priority(self):
+    """When two policies have identical priority, the first registered is evaluated."""
     call_count = 0
 
     def counting_predicate(unused_args: Mapping[str, Any]) -> bool:
@@ -270,29 +274,10 @@ class ShortCircuitTest(unittest.IsolatedAsyncioTestCase):
     ctx = hooks.HookContext()
     result = await hook.run(ctx, _make_tool_call("run_command"))
     self.assertFalse(result.allow)
-    # Only the first deny's predicate should have been called.
-    self.assertEqual(call_count, 1)
-
-  async def test_first_match_wins_within_allow_group(self):
-    """When two specific allow policies match, only the first is evaluated."""
-    call_count = 0
-
-    def counting_predicate(unused_args: Mapping[str, Any]) -> bool:
-      nonlocal call_count
-      call_count += 1
-      return True
-
-    hook = policy.enforce([
-        policy.allow("read_file", when=counting_predicate),
-        policy.allow("read_file", when=counting_predicate),
-    ])
-    ctx = hooks.HookContext()
-    result = await hook.run(ctx, _make_tool_call("read_file"))
-    self.assertTrue(result.allow)
     self.assertEqual(call_count, 1)
 
   async def test_skips_non_matching_predicate(self):
-    """A policy whose predicate returns False is skipped; next one wins."""
+    """A policy whose predicate returns False is skipped; next matching policy wins."""
     hook = policy.enforce([
         policy.deny("run_command", when=lambda args: False, name="skip-me"),
         policy.deny("run_command", when=lambda args: True, name="catch-me"),
@@ -759,181 +744,19 @@ class ConfirmCommandsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(p, policy.Policy)
 
 
-class WorkspaceOnlyTest(unittest.IsolatedAsyncioTestCase):
-  """Verifies workspace_only() — restricts file tools to workspace dirs.
+class WorkspaceOnlyTest(unittest.TestCase):
+  """Verifies workspace_only() builder."""
 
-  File tools targeting paths outside configured workspaces are denied.
-  Non-file tools and calls without path arguments are unaffected.
-  """
-
-  async def test_allows_files_inside_workspace(self):
-    """File tool with path inside workspace is allowed."""
+  def test_workspace_only_returns_deny_policies_for_file_tools(self):
+    """workspace_only() returns deny policies for all file tools."""
     policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(
-        ctx, _make_tool_call("view_file", path="/tmp/workspace/foo.py")
-    )
-    self.assertTrue(result.allow)
-
-  async def test_denies_files_outside_workspace(self):
-    """File tool with path outside workspace is denied."""
-    policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(
-        ctx, _make_tool_call("view_file", path="/etc/secrets/key.pem")
-    )
-    self.assertFalse(result.allow)
-    self.assertIn("workspace_only", result.message)
-
-  async def test_denies_create_outside_workspace(self):
-    """create_file outside workspace is denied."""
-    policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(
-        ctx, _make_tool_call("create_file", TargetFile="/etc/malicious.sh")
-    )
-    self.assertFalse(result.allow)
-
-  async def test_denies_edit_outside_workspace(self):
-    """edit_file outside workspace is denied."""
-    policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(
-        ctx, _make_tool_call("edit_file", file_path="/etc/passwd")
-    )
-    self.assertFalse(result.allow)
-
-  async def test_allows_non_file_tools(self):
-    """Non-file tools are unaffected — no matching policy, default allows."""
-    policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(ctx, _make_tool_call("run_command"))
-    self.assertTrue(result.allow)
-
-  async def test_allows_when_no_path_arg(self):
-    """File tool with no path argument is allowed (don't break edge cases)."""
-    policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    # A view_file call with no path arg — the predicate returns False,
-    # so the deny policy doesn't match and the call is allowed.
-    result = await hook.run(ctx, _make_tool_call("view_file"))
-    self.assertTrue(result.allow)
-
-  async def test_multiple_workspaces(self):
-    """Paths in any configured workspace are allowed."""
-    policies = policy.workspace_only(["/tmp/ws1", "/tmp/ws2"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(
-        ctx, _make_tool_call("view_file", path="/tmp/ws1/a.py")
-    )
-    self.assertTrue(result.allow)
-    result = await hook.run(
-        ctx, _make_tool_call("view_file", path="/tmp/ws2/b.py")
-    )
-    self.assertTrue(result.allow)
-
-  async def test_prevents_path_prefix_attack(self):
-    """Path /workspace-evil/file.txt must NOT match workspace /workspace.
-
-    Uses os.sep boundary check to prevent prefix-based traversal.
-    """
-    policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(
-        ctx, _make_tool_call("view_file", path="/tmp/workspace-evil/file.txt")
-    )
-    self.assertFalse(result.allow)
-
-  async def test_exact_workspace_path_allowed(self):
-    """A path that is exactly the workspace directory itself is allowed."""
-    policies = policy.workspace_only(["/tmp/workspace"])
-    hook = policy.enforce(policies)
-    ctx = hooks.HookContext()
-    result = await hook.run(
-        ctx, _make_tool_call("view_file", path="/tmp/workspace")
-    )
-    self.assertTrue(result.allow)
-
-
-class PolicyPathScopingDirectTest(absltest.TestCase):
-  """Direct unit tests for path normalization and workspace scoping."""
-
-  def setUp(self):
-    super().setUp()
-    # Symmetrically resolve base directory using standard buildenv temp dirs
-    self.temp_dir = self.enterContext(tempfile.TemporaryDirectory())
-    self.temp_dir_path = pathlib.Path(self.temp_dir).resolve()
-
-  def test_secure_normalize_path_resolves_existing_symlinks(self):
-    """_secure_normalize_path must follow and resolve existing symlinks."""
-    # Create real folder and symlink pointing to it
-    real_dir = self.temp_dir_path / "real_dir"
-    real_dir.mkdir(exist_ok=True)
-    symlink_dir = self.temp_dir_path / "symlink_dir"
-
-    try:
-      os.symlink(real_dir, symlink_dir)
-    except OSError:
-      self.skipTest("Symbolic links are not supported in this environment.")
-
-    resolved_path = policy._secure_normalize_path(str(symlink_dir / "file.txt"))
-
-    # Assert that the symlinked parent was resolved to the canonical real_dir
-    self.assertEqual(resolved_path, real_dir / "file.txt")
-
-  def test_is_case_insensitive_prober(self):
-    """_is_case_insensitive must dynamically check OS filesystem case sensitivity."""
-    # Probe our active hermetic temp directory
-    is_ci = policy._is_case_insensitive(self.temp_dir_path)
-
-    # Validate platform expectations
-    expected_ci = sys.platform in ("win32", "darwin")
-    self.assertEqual(is_ci, expected_ci)
-
-  def test_is_path_in_workspace_structural_containment(self):
-    """is_path_in_workspace must securely check path containment component-wise."""
-    ws = self.temp_dir_path / "my_workspace"
-    ws.mkdir(exist_ok=True)
-
-    self.assertTrue(
-        policy._is_path_in_workspace(str(ws / "sub/file.txt"), str(ws))
-    )
-
-    self.assertTrue(policy._is_path_in_workspace(str(ws), str(ws)))
-
-    evil_ws = self.temp_dir_path / "my_workspace-evil"
-    self.assertFalse(
-        policy._is_path_in_workspace(str(evil_ws / "file.txt"), str(ws))
-    )
-
-    self.assertFalse(
-        policy._is_path_in_workspace(
-            str(self.temp_dir_path / "outside.txt"), str(ws)
-        )
-    )
-
-  def test_is_path_in_workspace_case_folding(self):
-    """is_path_in_workspace must fold casing symmetrically on case-insensitive drives."""
-    ws = self.temp_dir_path / "WorkspaceDir"
-    ws.mkdir(exist_ok=True)
-
-    # Query filesystem casing to verify case folding behavior
-    if policy._is_case_insensitive(ws):
-      # On case-insensitive APFS/Windows, lowercased paths must match
-      lower_target = str(ws).lower() + "/sub/file.txt"
-      self.assertTrue(policy._is_path_in_workspace(lower_target, str(ws)))
-    else:
-      # On case-sensitive EXT4 Linux, mismatched casing must be blocked
-      upper_target = str(ws).upper() + "/sub/file.txt"
-      self.assertFalse(policy._is_path_in_workspace(upper_target, str(ws)))
+    self.assertIsInstance(policies, list)
+    file_tools = [t.value for t in types.BuiltinTools.file_tools()]
+    self.assertEqual(len(policies), len(file_tools))
+    for p in policies:
+      self.assertEqual(p.decision, policy.Decision.DENY)
+      self.assertEqual(p.name, "workspace_only")
+      self.assertIn(p.tool, file_tools)
 
 
 class McpPolicyTest(unittest.IsolatedAsyncioTestCase):
@@ -1031,25 +854,6 @@ class McpPolicyTest(unittest.IsolatedAsyncioTestCase):
 
     result = await hook.run(ctx, _make_tool_call("calc", server_name="math"))
     self.assertTrue(result.allow)
-
-  async def test_9_level_priority_specific_allow_beats_prefix_deny(self):
-    """Specific Allow (level 2) must beat Prefix Deny (level 3)."""
-    policies = [
-        policy.allow(
-            self.mcp_config, ["calc"]
-        ),  # math/calc -> Specific Allow (level 2)
-        policy.deny(self.mcp_config),  # math/* -> Prefix Deny (level 3)
-    ]
-    hook = policy.enforce(policies, mcp_servers=[self.mcp_config])
-    ctx = hooks.HookContext()
-
-    result = await hook.run(ctx, _make_tool_call("calc", server_name="math"))
-    self.assertTrue(result.allow)
-
-    result = await hook.run(
-        ctx, _make_tool_call("multiply", server_name="math")
-    )
-    self.assertFalse(result.allow)
 
   def test_enforce_rejects_non_policy_in_sequence(self):
     """enforce() must raise ValueError if a non-Policy is found in a nested sequence."""
