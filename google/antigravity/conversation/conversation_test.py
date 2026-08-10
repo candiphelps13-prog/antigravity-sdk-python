@@ -1132,6 +1132,21 @@ class ConversationSendDrainTest(unittest.IsolatedAsyncioTestCase):
     mock_connection.send.assert_called_once_with("prompt while draining")
     self.assertEqual(conv.turn_count, 1)
 
+  def test_last_turn_stop_reason(self) -> None:
+    mock_connection = self._make_conn()
+    mock_connection._last_turn_stop_reason = types.StopReason.UNSPECIFIED
+    conv = conversation.Conversation(mock_connection)
+    self.assertEqual(
+        conv._last_turn_stop_reason,
+        types.StopReason.UNSPECIFIED,
+    )
+
+    mock_connection._last_turn_stop_reason = types.StopReason.QUOTA_EXHAUSTED
+    self.assertEqual(
+        conv._last_turn_stop_reason,
+        types.StopReason.QUOTA_EXHAUSTED,
+    )
+
 
 if __name__ == "__main__":
   unittest.main()

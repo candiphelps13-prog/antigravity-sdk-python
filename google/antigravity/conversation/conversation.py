@@ -322,6 +322,11 @@ class Conversation:
     """Internal alias for last_turn_usage."""
     return self.last_turn_usage
 
+  @property
+  def _last_turn_stop_reason(self) -> types.StopReason:
+    """Returns the stop reason of the most recent turn."""
+    return self._connection._last_turn_stop_reason  # pylint: disable=protected-access
+
   # ---------------------------------------------------------------------------
   # Lifecycle
   # ---------------------------------------------------------------------------

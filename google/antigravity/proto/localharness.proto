@@ -480,9 +480,14 @@ message TrajectoryStateUpdate {
     STATE_CANCELLED = 3;
     STATE_WAITING_FOR_TASKS = 4;
   }
+  enum StopReason {
+    STOP_REASON_UNSPECIFIED = 0;
+    STOP_REASON_QUOTA_EXHAUSTED = 6;
+  }
   string trajectory_id = 2;
   .antigravity.localharness.TrajectoryStateUpdate.State state = 3;
   string error = 4;
+  .antigravity.localharness.TrajectoryStateUpdate.StopReason stop_reason = 5;
 }
 message TrajectoryUsageEntry {
   string trajectory_id = 1;

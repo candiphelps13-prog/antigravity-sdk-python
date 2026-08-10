@@ -1119,6 +1119,20 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
     )
     await asyncio.wait_for(consumer_task, timeout=1.0)
 
+  async def test_last_turn_stop_reason(self):
+    harness = self._make_harness()
+    self.assertEqual(
+        harness.conn._last_turn_stop_reason,
+        types.StopReason.UNSPECIFIED,
+    )
+    harness.conn._processor._turn_stop_reason = (
+        types.StopReason.QUOTA_EXHAUSTED
+    )
+    self.assertEqual(
+        harness.conn._last_turn_stop_reason,
+        types.StopReason.QUOTA_EXHAUSTED,
+    )
+
 
 class LocalConnectionToolCallNoRunnerTest(unittest.IsolatedAsyncioTestCase):
   """Tests for tool call handling when no ToolRunner is configured."""

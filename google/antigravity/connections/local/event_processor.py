@@ -194,6 +194,20 @@ def parse_usage_metadata(
   )
 
 
+_STOP_REASON_MAP = {
+    localharness_pb2.TrajectoryStateUpdate.StopReason.STOP_REASON_QUOTA_EXHAUSTED: (
+        types.StopReason.QUOTA_EXHAUSTED
+    ),
+}
+
+
+def _parse_stop_reason(
+    reason: localharness_pb2.TrajectoryStateUpdate.StopReason,
+) -> types.StopReason:
+  """Extracts StopReason from proto enum."""
+  return _STOP_REASON_MAP.get(reason, types.StopReason.UNSPECIFIED)
+
+
 class LocalConnectionStep(types.Step):
   """Connection-specific step for LocalConnection."""
 
@@ -395,10 +409,12 @@ class LocalHarnessEventProcessor:
         if initial_trajectory_usages is not None
         else {}
     )
+    self._turn_stop_reason: types.StopReason = types.StopReason.UNSPECIFIED
 
   def reset_for_turn(self) -> None:
     self.is_idle.clear()
     self.main_trajectory_id = None
+    self._turn_stop_reason = types.StopReason.UNSPECIFIED
     while not self.step_queue.empty():
       try:
         self.step_queue.get_nowait()
@@ -414,6 +430,11 @@ class LocalHarnessEventProcessor:
   def trajectory_usages(self) -> dict[str, types.UsageMetadata]:
     """Returns per-trajectory cumulative token usage from the backend."""
     return self._trajectory_usages.copy()
+
+  @property
+  def _last_turn_stop_reason(self) -> types.StopReason:
+    """Returns the stop reason of the most recent turn."""
+    return self._turn_stop_reason
 
   async def cancel_background_tasks(self) -> None:
     for task in self._background_tasks:
@@ -579,6 +600,9 @@ class LocalHarnessEventProcessor:
         if tsu.HasField("error"):
           logging.info("Subagent trajectory failed with error: %s", tsu.error)
         return
+
+      if tsu.stop_reason:
+        self._turn_stop_reason = _parse_stop_reason(tsu.stop_reason)
 
       if (
           tsu.state

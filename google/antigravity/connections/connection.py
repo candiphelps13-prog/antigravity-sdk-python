@@ -246,6 +246,15 @@ class Connection(abc.ABC):
     """
     return {}
 
+  @property
+  def _last_turn_stop_reason(self) -> types.StopReason:
+    """Returns the stop reason of the most recent turn.
+
+    Subclasses override to provide live stop reason data. Default returns
+    UNSPECIFIED.
+    """
+    return types.StopReason.UNSPECIFIED
+
   @abc.abstractmethod
   async def send(self, prompt: types.Content | None, **kwargs: Any) -> None:
     """Sends a prompt to the agent.

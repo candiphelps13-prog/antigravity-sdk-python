@@ -85,6 +85,20 @@ class EventProcessorHelperTest(absltest.TestCase):
     self.assertIsNone(meta.total_token_count)
     self.assertIsNone(meta.service_tier)
 
+  def test_parse_stop_reason(self):
+    self.assertEqual(
+        event_processor._parse_stop_reason(  # pylint: disable=protected-access
+            localharness_pb2.TrajectoryStateUpdate.STOP_REASON_QUOTA_EXHAUSTED
+        ),
+        types.StopReason.QUOTA_EXHAUSTED,
+    )
+    self.assertEqual(
+        event_processor._parse_stop_reason(  # pylint: disable=protected-access
+            localharness_pb2.TrajectoryStateUpdate.STOP_REASON_UNSPECIFIED
+        ),
+        types.StopReason.UNSPECIFIED,
+    )
+
 
 class LocalConnectionStepFromDictTest(absltest.TestCase):
   """Tests for LocalConnectionStep.from_dict derivation logic.
@@ -403,6 +417,32 @@ class LocalHarnessEventProcessorTest(unittest.IsolatedAsyncioTestCase):
     await processor.process_event(event)
 
     self.assertFalse(processor.is_idle.is_set())
+
+  async def test_process_event_updates_stop_reason(self):
+    processor = event_processor.LocalHarnessEventProcessor(
+        send_input_event_fn=mock.AsyncMock()
+    )
+    processor.main_trajectory_id = MAIN_TRAJECTORY_ID
+
+    event = localharness_pb2.OutputEvent(
+        trajectory_state_update=localharness_pb2.TrajectoryStateUpdate(
+            state=localharness_pb2.TrajectoryStateUpdate.State.STATE_FULLY_IDLE,
+            trajectory_id=MAIN_TRAJECTORY_ID,
+            stop_reason=localharness_pb2.TrajectoryStateUpdate.STOP_REASON_QUOTA_EXHAUSTED,
+        )
+    )
+    await processor.process_event(event)
+
+    self.assertEqual(
+        processor._last_turn_stop_reason,
+        types.StopReason.QUOTA_EXHAUSTED,
+    )
+
+    processor.reset_for_turn()
+    self.assertEqual(
+        processor._last_turn_stop_reason,
+        types.StopReason.UNSPECIFIED,
+    )
 
   async def test_main_agent_idle_sets_idle_state(self):
     """Verifies that when the main agent is IDLE, the connection is idle."""

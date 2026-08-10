@@ -1868,5 +1868,25 @@ class RetryConfigTest(unittest.TestCase):
       types.ModelOutputRetryConfig(max_retries=2**32)
 
 
+class BudgetEnforcementTypesTest(absltest.TestCase):
+  """Tests for StopReason."""
+
+  def test_stop_reason_enum(self):
+    self.assertEqual(types.StopReason.UNSPECIFIED, "UNSPECIFIED")
+    self.assertEqual(types.StopReason.QUOTA_EXHAUSTED, "QUOTA_EXHAUSTED")
+
+  def test_chat_response_stop_reason(self):
+    async def mock_stream():
+      yield types.Text(step_index=1, text="")
+
+    mock_conv = mock.MagicMock(spec=conversation.Conversation)
+    mock_conv._last_turn_stop_reason = types.StopReason.QUOTA_EXHAUSTED
+    response = types.ChatResponse(mock_stream(), conversation=mock_conv)
+    self.assertEqual(
+        response.stop_reason,
+        types.StopReason.QUOTA_EXHAUSTED,
+    )
+
+
 if __name__ == "__main__":
   absltest.main()

@@ -331,6 +331,11 @@ class LocalConnection(connection.Connection):
     """Returns per-trajectory cumulative token usage from the backend."""
     return self._processor.trajectory_usages
 
+  @property
+  def _last_turn_stop_reason(self) -> types.StopReason:
+    """Returns the stop reason of the most recent turn from the backend."""
+    return self._processor._last_turn_stop_reason  # pylint: disable=protected-access
+
   async def send(self, prompt: types.Content | None, **kwargs: Any) -> None:
     """Sends a prompt to the agent.
 

@@ -74,6 +74,7 @@ __all__ = [
     "StepSource",
     "StepTarget",
     "StepStatus",
+    "StopReason",
     "Step",
     "HookResult",
     "QuestionResponse",
@@ -744,6 +745,18 @@ class SessionContinuationMode(str, enum.Enum):
   CREATE_ONLY = "create_only"
 
 
+class StopReason(str, enum.Enum):
+  """Reason why the execution turn stopped.
+
+  Attributes:
+    UNSPECIFIED: Default value; normal completion or unspecified stop reason.
+    QUOTA_EXHAUSTED: Turn halted because backend model API quota was exhausted.
+  """
+
+  UNSPECIFIED = "UNSPECIFIED"
+  QUOTA_EXHAUSTED = "QUOTA_EXHAUSTED"
+
+
 class Step(pydantic.BaseModel):
   """Structure representing one action in the agent trajectory.
 
@@ -1111,6 +1124,11 @@ class ChatResponse:
   def usage_metadata(self) -> UsageMetadata | None:
     """Accumulated token usage across all model invocations in this turn."""
     return self._conversation.last_turn_usage
+
+  @property
+  def stop_reason(self) -> StopReason:
+    """The reason why the execution turn stopped."""
+    return self._conversation._last_turn_stop_reason  # pylint: disable=protected-access
 
   async def cancel(self) -> None:
     """Cancels the active execution turn and halts generation.
