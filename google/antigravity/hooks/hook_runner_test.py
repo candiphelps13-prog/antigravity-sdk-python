@@ -314,6 +314,20 @@ class HookRunnerTest(unittest.IsolatedAsyncioTestCase):
     with self.assertRaises(ValueError):
       runner.register_hook("not a hook")
 
+  async def test_register_multi_hook(self):
+    runner = hook_runner.HookRunner()
+
+    class MultiHook(hooks.OnSessionStartHook, hooks.OnSessionEndHook):
+
+      async def run(self, context: hooks.HookContext, data: Any) -> None:
+        pass
+
+    my_hook = MultiHook()
+    runner.register_hook(my_hook)
+
+    self.assertIn(my_hook, runner.on_session_start_hooks)
+    self.assertIn(my_hook, runner.on_session_end_hooks)
+
   async def test_dispatch_post_turn(self):
     called = False
 

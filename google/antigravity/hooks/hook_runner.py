@@ -144,11 +144,13 @@ class HookRunner:
     Raises:
       ValueError: If the hook type is unknown.
     """
+    registered = False
     for hook_type, attr_name in _HOOK_TYPE_REGISTRY:
       if isinstance(hook, hook_type):
         getattr(self, attr_name).append(hook)
-        return
-    raise ValueError(f'Unknown hook type: {type(hook)}')
+        registered = True
+    if not registered:
+      raise ValueError(f'Unknown hook type: {type(hook)}')
 
   # Session
   async def dispatch_session_start(self) -> None:
