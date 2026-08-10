@@ -97,7 +97,8 @@ Predicate = Callable[..., bool | Awaitable[bool]]
 AskUserHandler = Callable[[types.ToolCall], bool | Awaitable[bool]]
 
 _WILDCARD = "*"
-_WORKSPACE_ONLY_POLICY_NAME = "workspace_only"
+WORKSPACE_ONLY_POLICY_NAME = "workspace_only"
+_WORKSPACE_ONLY_POLICY_NAME = WORKSPACE_ONLY_POLICY_NAME
 
 
 class Decision(enum.Enum):
@@ -298,7 +299,7 @@ def deny(
 def ask_user(
     tool: str,
     *,
-    handler: AskUserHandler,
+    handler: AskUserHandler | None = None,
     when: Predicate | None = None,
     name: str = "",
 ) -> Policy:
@@ -310,7 +311,7 @@ def ask_user(
     tool: types.BaseMcpServerConfig,
     mcp_tools: Sequence[str] | None = None,
     *,
-    handler: AskUserHandler,
+    handler: AskUserHandler | None = None,
     when: Predicate | None = None,
     name: str = "",
 ) -> list[Policy]:
@@ -321,7 +322,7 @@ def ask_user(
     tool: str | types.BaseMcpServerConfig,
     mcp_tools: Sequence[str] | None = None,
     *,
-    handler: AskUserHandler,
+    handler: AskUserHandler | None = None,
     when: Predicate | None = None,
     name: str = "",
 ) -> Any:
@@ -330,7 +331,8 @@ def ask_user(
   Args:
     tool: Tool name, "*" for all tools, or BaseMcpServerConfig.
     mcp_tools: Optional list of tool names if BaseMcpServerConfig is provided.
-    handler: Callable invoked to obtain user approval.
+    handler: Optional callable invoked to obtain user approval for the tool
+      call. If omitted, confirmation is delegated to the host platform.
     when: Optional argument predicate.
     name: Human-readable label.
 
@@ -799,7 +801,7 @@ class _PolicyDecideHook(hooks.PreToolCallDecideHook):
 # ---------------------------------------------------------------------------
 
 
-def _flatten_policies(
+def flatten_policies(
     policies: Sequence[Policy | Sequence[Policy]],
 ) -> list[Policy]:
   """Flattens nested sequences of policies into a flat list.
@@ -879,7 +881,7 @@ def _to_policy_config_proto(
     maps rule_id -> Policy for dynamic rules, used by the event processor
     to handle incoming PolicyDecisionRequest messages.
   """
-  flat = _flatten_policies(policies)
+  flat = flatten_policies(policies)
 
   dynamic_policy_map: dict[str, Policy] = {}
   proto_rules: list[localharness_pb2.PolicyRule] = []
@@ -943,13 +945,13 @@ def enforce(
     ValueError: If any ASK_USER policy is missing a handler, or if MCP
       policies are used without mcp_servers.
   """
-  flat_policies = _flatten_policies(policies)
+  flat_policies = flatten_policies(policies)
 
   # Validate MCP policies against mcp_servers (Fail-Closed Security Guard)
   has_mcp_policy = any(
       ("/" in p.tool and p.tool != _WILDCARD) for p in flat_policies
   )
-  if has_mcp_policy and not mcp_servers:
+  if has_mcp_policy and mcp_servers is None:
     raise ValueError(
         "MCP policies (containing '/') were detected, but 'mcp_servers' was not"
         " provided to enforce(). You must pass the registered MCP servers to"

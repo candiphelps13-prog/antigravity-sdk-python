@@ -93,6 +93,24 @@ class BuilderTest(unittest.TestCase):
     self.assertEqual(p.decision, policy.Decision.ASK_USER)
     self.assertIs(p.ask_user, handler)
 
+  def test_ask_user_without_handler_creates_ask_user_policy(self):
+    """ask_user() without handler produces a Policy with ask_user=None for Hub UI confirmation."""
+    p = policy.ask_user("run_command", name="hub-confirm-cmd")
+    self.assertEqual(p.tool, "run_command")
+    self.assertEqual(p.decision, policy.Decision.ASK_USER)
+    self.assertIsNone(p.ask_user)
+    self.assertEqual(p.name, "hub-confirm-cmd")
+
+  def test_ask_user_mcp_server_without_handler(self):
+    """ask_user(BaseMcpServerConfig, handler=None) returns list[Policy] with ask_user=None."""
+    mcp = types.McpStdioServer(name="my_server", command="cmd")
+    policies = policy.ask_user(mcp)
+    self.assertIsInstance(policies, list)
+    self.assertGreater(len(policies), 0)
+    for p in policies:
+      self.assertEqual(p.decision, policy.Decision.ASK_USER)
+      self.assertIsNone(p.ask_user)
+
   def test_deny_with_predicate(self):
     """deny() with a when clause stores the predicate."""
     def pred(args):
@@ -137,6 +155,20 @@ class ValidationTest(unittest.TestCase):
     with self.assertRaises(ValueError) as ctx:
       policy.enforce([bad_policy])
     self.assertIn("my_tool", str(ctx.exception))
+
+  def test_enforce_rejects_mcp_policies_when_mcp_servers_is_none(self):
+    """enforce() raises ValueError when MCP policies are used without mcp_servers."""
+    mcp_policy = policy.allow("github/create_issue")
+    with self.assertRaisesRegex(
+        ValueError, "MCP policies .* were detected, but 'mcp_servers' was not"
+    ):
+      policy.enforce([mcp_policy])
+
+  def test_enforce_allows_mcp_policies_when_mcp_servers_is_empty_list(self):
+    """enforce() allows MCP policies when mcp_servers is passed as empty list (Hub mode)."""
+    mcp_policy = policy.allow("github/create_issue")
+    hook = policy.enforce([mcp_policy], mcp_servers=[])
+    self.assertIsInstance(hook, policy._PolicyDecideHook)
 
 
 class PriorityEvaluationTest(unittest.IsolatedAsyncioTestCase):
