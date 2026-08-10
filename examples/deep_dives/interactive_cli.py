@@ -43,7 +43,7 @@ from google.antigravity.utils import interactive
 from google.antigravity.utils.interactive import async_input
 
 _MODEL_NAME = flags.DEFINE_string(
-    "model_name", "gemini-3.6-flash", "Gemini model name."
+    "model_name", "gemini-3.7-flash", "Gemini model name."
 )
 _SYSTEM_INSTRUCTION = flags.DEFINE_string(
     "system_instruction", None, "System instruction text for the agent."
