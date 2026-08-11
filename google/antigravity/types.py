@@ -418,6 +418,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
 
 _MAX_INT32 = 2**31 - 1  # Maximum value for protobuf int32 wire fields
 _MAX_UINT32 = 2**32 - 1  # Maximum value for protobuf uint32 wire fields
+_MAX_INT64 = 2**63 - 1  # Maximum value for protobuf int64 wire fields
 
 
 class ModelAPIRetryConfig(pydantic.BaseModel):
@@ -755,12 +756,29 @@ class BudgetConfig(pydantic.BaseModel):
       generator calls) permitted across the session.
     max_tool_calls: Maximum number of tool invocations permitted across the
       session, regardless of tool source.
+    max_input_tokens: Maximum net uncached input tokens permitted across the
+      session (calculated as prompt tokens minus cached content tokens across
+      all turns).
+    max_output_tokens: Maximum output tokens permitted across the session
+      (candidates + thoughts).
+    max_total_tokens: Maximum total net tokens permitted across the session
+      (calculated as net uncached input tokens + output tokens across all
+      turns).
   """
 
   max_model_calls: int | None = pydantic.Field(
       default=None, ge=1, le=_MAX_INT32
   )
   max_tool_calls: int | None = pydantic.Field(default=None, ge=1, le=_MAX_INT32)
+  max_input_tokens: int | None = pydantic.Field(
+      default=None, ge=1, le=_MAX_INT64
+  )
+  max_output_tokens: int | None = pydantic.Field(
+      default=None, ge=1, le=_MAX_INT64
+  )
+  max_total_tokens: int | None = pydantic.Field(
+      default=None, ge=1, le=_MAX_INT64
+  )
 
 
 class StopReason(str, enum.Enum):
@@ -772,12 +790,21 @@ class StopReason(str, enum.Enum):
       max_model_calls.
     MAX_TOOL_CALLS_EXCEEDED: Turn halted because session exceeded
       max_tool_calls.
+    MAX_INPUT_TOKENS_EXCEEDED: Turn halted because session exceeded
+      max_input_tokens.
+    MAX_OUTPUT_TOKENS_EXCEEDED: Turn halted because session exceeded
+      max_output_tokens.
+    MAX_TOTAL_TOKENS_EXCEEDED: Turn halted because session exceeded
+      max_total_tokens.
     QUOTA_EXHAUSTED: Turn halted because backend model API quota was exhausted.
   """
 
   UNSPECIFIED = "UNSPECIFIED"
   MAX_MODEL_CALLS_EXCEEDED = "MAX_MODEL_CALLS_EXCEEDED"
   MAX_TOOL_CALLS_EXCEEDED = "MAX_TOOL_CALLS_EXCEEDED"
+  MAX_INPUT_TOKENS_EXCEEDED = "MAX_INPUT_TOKENS_EXCEEDED"
+  MAX_OUTPUT_TOKENS_EXCEEDED = "MAX_OUTPUT_TOKENS_EXCEEDED"
+  MAX_TOTAL_TOKENS_EXCEEDED = "MAX_TOTAL_TOKENS_EXCEEDED"
   QUOTA_EXHAUSTED = "QUOTA_EXHAUSTED"
 
 

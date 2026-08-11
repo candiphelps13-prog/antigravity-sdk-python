@@ -485,6 +485,9 @@ message TrajectoryStateUpdate {
     STOP_REASON_UNSPECIFIED = 0;
     STOP_REASON_MAX_MODEL_CALLS_EXCEEDED = 1;
     STOP_REASON_MAX_TOOL_CALLS_EXCEEDED = 2;
+    STOP_REASON_MAX_INPUT_TOKENS_EXCEEDED = 3;
+    STOP_REASON_MAX_OUTPUT_TOKENS_EXCEEDED = 4;
+    STOP_REASON_MAX_TOTAL_TOKENS_EXCEEDED = 5;
     STOP_REASON_QUOTA_EXHAUSTED = 6;
   }
   string trajectory_id = 2;
@@ -720,4 +723,7 @@ message PolicyDecisionResponse {
 message BudgetConfig {
   int32 max_model_calls = 1;
   int32 max_tool_calls = 2;
+  int64 max_input_tokens = 3;
+  int64 max_output_tokens = 4;
+  int64 max_total_tokens = 5;
 }

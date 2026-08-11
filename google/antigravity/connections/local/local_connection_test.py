@@ -2080,12 +2080,18 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     budget_cfg = types.BudgetConfig(
         max_model_calls=5,
         max_tool_calls=10,
+        max_input_tokens=500,
+        max_output_tokens=200,
+        max_total_tokens=1000,
     )
     strategy = self._make_strategy(budget_config=budget_cfg)
     config = strategy._build_harness_config()
     self.assertTrue(config.HasField("budget_config"))
     self.assertEqual(config.budget_config.max_model_calls, 5)
     self.assertEqual(config.budget_config.max_tool_calls, 10)
+    self.assertEqual(config.budget_config.max_input_tokens, 500)
+    self.assertEqual(config.budget_config.max_output_tokens, 200)
+    self.assertEqual(config.budget_config.max_total_tokens, 1000)
 
   def test_retry_config_api_retry_only(self):
     """Verifies translation when only api_retry is configured."""

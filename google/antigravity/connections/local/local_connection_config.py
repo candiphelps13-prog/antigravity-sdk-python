@@ -175,6 +175,7 @@ class LocalAgentConfig(BaseLocalAgentConfig):
       ) = None,
       skills_paths: list[str] | None = None,
       retry_config: types.RetryConfig | None = None,
+      budget_config: types.BudgetConfig | None = None,
       model: str | types.ModelTarget | None = None,
       models: list[types.ModelTarget] | None = None,
       api_key: str | None = None,

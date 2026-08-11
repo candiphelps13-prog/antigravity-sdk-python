@@ -1871,6 +1871,48 @@ class RetryConfigTest(unittest.TestCase):
 class BudgetEnforcementTypesTest(absltest.TestCase):
   """Tests for StopReason."""
 
+  def test_budget_config_defaults_and_validation(self):
+    cfg = types.BudgetConfig()
+    self.assertIsNone(cfg.max_model_calls)
+    self.assertIsNone(cfg.max_tool_calls)
+    self.assertIsNone(cfg.max_input_tokens)
+    self.assertIsNone(cfg.max_output_tokens)
+    self.assertIsNone(cfg.max_total_tokens)
+
+    cfg_valid = types.BudgetConfig(
+        max_model_calls=5,
+        max_tool_calls=10,
+        max_input_tokens=500,
+        max_output_tokens=200,
+        max_total_tokens=1000,
+    )
+    self.assertEqual(cfg_valid.max_model_calls, 5)
+    self.assertEqual(cfg_valid.max_tool_calls, 10)
+    self.assertEqual(cfg_valid.max_input_tokens, 500)
+    self.assertEqual(cfg_valid.max_output_tokens, 200)
+    self.assertEqual(cfg_valid.max_total_tokens, 1000)
+
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_model_calls=0)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_model_calls=2**31)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_tool_calls=0)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_tool_calls=2**31)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_input_tokens=0)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_input_tokens=2**63)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_output_tokens=0)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_output_tokens=2**63)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_total_tokens=0)
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_total_tokens=2**63)
+
   def test_stop_reason_enum(self):
     self.assertEqual(types.StopReason.UNSPECIFIED, "UNSPECIFIED")
     self.assertEqual(
@@ -1880,6 +1922,18 @@ class BudgetEnforcementTypesTest(absltest.TestCase):
     self.assertEqual(
         types.StopReason.MAX_TOOL_CALLS_EXCEEDED,
         "MAX_TOOL_CALLS_EXCEEDED",
+    )
+    self.assertEqual(
+        types.StopReason.MAX_INPUT_TOKENS_EXCEEDED,
+        "MAX_INPUT_TOKENS_EXCEEDED",
+    )
+    self.assertEqual(
+        types.StopReason.MAX_OUTPUT_TOKENS_EXCEEDED,
+        "MAX_OUTPUT_TOKENS_EXCEEDED",
+    )
+    self.assertEqual(
+        types.StopReason.MAX_TOTAL_TOKENS_EXCEEDED,
+        "MAX_TOTAL_TOKENS_EXCEEDED",
     )
     self.assertEqual(types.StopReason.QUOTA_EXHAUSTED, "QUOTA_EXHAUSTED")
 
@@ -1894,20 +1948,6 @@ class BudgetEnforcementTypesTest(absltest.TestCase):
         response.stop_reason,
         types.StopReason.QUOTA_EXHAUSTED,
     )
-
-  def test_budget_config_validation(self):
-    config = types.BudgetConfig(
-        max_model_calls=5,
-        max_tool_calls=10,
-    )
-    self.assertEqual(config.max_model_calls, 5)
-    self.assertEqual(config.max_tool_calls, 10)
-
-    with self.assertRaises(pydantic.ValidationError):
-      types.BudgetConfig(max_model_calls=0)
-
-    with self.assertRaises(pydantic.ValidationError):
-      types.BudgetConfig(max_tool_calls=-1)
 
 
 if __name__ == "__main__":

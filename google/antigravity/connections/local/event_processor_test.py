@@ -100,6 +100,24 @@ class EventProcessorHelperTest(absltest.TestCase):
     )
     self.assertEqual(
         event_processor._parse_stop_reason(  # pylint: disable=protected-access
+            localharness_pb2.TrajectoryStateUpdate.STOP_REASON_MAX_INPUT_TOKENS_EXCEEDED
+        ),
+        types.StopReason.MAX_INPUT_TOKENS_EXCEEDED,
+    )
+    self.assertEqual(
+        event_processor._parse_stop_reason(  # pylint: disable=protected-access
+            localharness_pb2.TrajectoryStateUpdate.STOP_REASON_MAX_OUTPUT_TOKENS_EXCEEDED
+        ),
+        types.StopReason.MAX_OUTPUT_TOKENS_EXCEEDED,
+    )
+    self.assertEqual(
+        event_processor._parse_stop_reason(  # pylint: disable=protected-access
+            localharness_pb2.TrajectoryStateUpdate.STOP_REASON_MAX_TOTAL_TOKENS_EXCEEDED
+        ),
+        types.StopReason.MAX_TOTAL_TOKENS_EXCEEDED,
+    )
+    self.assertEqual(
+        event_processor._parse_stop_reason(  # pylint: disable=protected-access
             localharness_pb2.TrajectoryStateUpdate.STOP_REASON_QUOTA_EXHAUSTED
         ),
         types.StopReason.QUOTA_EXHAUSTED,
