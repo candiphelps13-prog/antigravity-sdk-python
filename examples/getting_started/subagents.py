@@ -12,32 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example demonstrating subagents in Google Antigravity SDK.
+"""Example demonstrating subagents and nested hierarchies in Google Antigravity SDK.
 
-This example shows two subagent scenarios:
-  1. Dynamic Subagent: The agent dynamically spawns a clone of itself ("self")
-     to delegate a heavy research task (listing/reading files), keeping its
-     own context window clean.
-  2. Custom Static Subagent: The agent is pre-configured with a custom, static
-     subagent definition ('code_reviewer') that has its own system instructions
-     and custom tools (e.g. get_reviewer_badge).
+This script demonstrates three core subagent workflows:
+  - Dynamic Self-Delegation: The agent dynamically spawns a clone of itself
+    ("self") to delegate a heavy research task while keeping its own context
+    window clean.
+  - Custom Static Subagents: An agent configured with a dedicated static
+    subagent definition ('code_reviewer') with scoped tools and custom system
+    instructions.
+  - Hierarchical Nested Subagents: A multi-tier delegation chain using
+    max_subagent_depth and allowed_subagents scoping ('root' ->
+    'lead_researcher'
+    -> 'fact_checker').
 
 To run:
   python subagents.py
 
 Criteria for correct script performance:
   1. The script exits cleanly with return code 0 (no unhandled exceptions).
-  2. In Scenario 1, the agent dynamically spawns a subagent to research the
-     examples directory.
-  3. In Scenario 1, the agent produces a non-empty lesson plan.
-  4. In Scenario 2, the 'code_reviewer' subagent audits target_code.py,
-     producing warnings prefixed with '[AUDIT_WARNING]'.
-  5. In Scenario 2, the subagent uses the 'get_reviewer_badge' tool to sign the
-     report with 'Senior-L3-Auditor-Badge'.
-  6. In Scenario 2, the 'code_reviewer' subagent only has access to its
-     allowlisted tool ('get_reviewer_badge') and cannot call unlisted root
-     tools ('get_root_admin_secret').
-  7. Subagent hook logs fire for both scenarios, showing start/done events.
+  2. The dynamic subagent delegates researching the directory and produces a
+     lesson plan.
+  3. The 'code_reviewer' subagent audits target_code.py, producing warnings
+     prefixed with '[AUDIT_WARNING]'.
+  4. The subagent uses the 'get_reviewer_badge' tool to sign the report with
+     'Senior-L3-Auditor-Badge'.
+  5. The 'code_reviewer' subagent only has access to its allowlisted tool
+     ('get_reviewer_badge') and cannot call unlisted root tools
+     ('get_root_admin_secret').
+  6. Subagent hook logs fire for all workflows, showing start/done events.
+  7. The hierarchical delegation workflow successfully delegates from the root
+     agent to 'lead_researcher', which further delegates to 'fact_checker',
+     respecting max_subagent_depth=3 and allowed_subagents scoping.
 """
 
 import asyncio
@@ -95,8 +101,8 @@ def get_root_admin_secret() -> str:
 
 
 async def run_dynamic_subagent() -> None:
-  """Runs a dynamic subagent research scenario."""
-  print("\n=== Scenario 1: Dynamic Subagent (Self Clone) ===")
+  """Runs a dynamic self-delegation research workflow."""
+  print("\n=== Dynamic Subagent (Self Clone) ===")
   # Enable subagents in the config and add hooks for visibility.
   config = LocalAgentConfig(
       capabilities=types.CapabilitiesConfig(
@@ -119,8 +125,8 @@ async def run_dynamic_subagent() -> None:
 
 
 async def run_custom_static_subagent() -> None:
-  """Runs a custom static subagent code-review audit scenario."""
-  print("\n=== Scenario 2: Custom Static Subagent ===")
+  """Runs a custom static subagent code-review audit workflow."""
+  print("\n=== Custom Static Subagent ===")
   with tempfile.TemporaryDirectory() as tmpdir:
     workspace_path = pathlib.Path(tmpdir) / "workspace"
     workspace_path.mkdir(parents=True, exist_ok=True)
@@ -199,6 +205,84 @@ async def run_custom_static_subagent() -> None:
       )
 
 
+async def run_nested_subagent_hierarchy() -> None:
+  """Runs a 3-tier nested subagent hierarchy workflow."""
+  print("\n=== Hierarchical Nested Subagents ===")
+  with tempfile.TemporaryDirectory() as tmpdir:
+    workspace_path = pathlib.Path(tmpdir) / "workspace"
+    workspace_path.mkdir(parents=True, exist_ok=True)
+
+    # Write files for the nested agents to research.
+    (workspace_path / "design.md").write_text(
+        "# Widget Design\n\n"
+        "The widget uses a pub/sub architecture with at-least-once delivery.\n"
+        "Messages are persisted to a WAL before acknowledgement.\n",
+        encoding="utf-8",
+    )
+    (workspace_path / "perf_data.txt").write_text(
+        "p50: 12ms, p99: 145ms, error_rate: 0.02%\n",
+        encoding="utf-8",
+    )
+
+    # Tier 3 (leaf): A fact-checker that can read files but cannot spawn
+    # further subagents.
+    fact_checker = types.SubagentConfig(
+        name="fact_checker",
+        description=(
+            "Reads specific files and verifies factual claims. Reports"
+            " findings back to the caller."
+        ),
+        capabilities=types.SubagentCapabilities(
+            enabled_tools=[
+                types.BuiltinTools.VIEW_FILE,
+                types.BuiltinTools.FIND_FILE,
+            ],
+        ),
+    )
+
+    # Tier 2 (middle): A lead researcher that can delegate to fact_checker.
+    lead_researcher = types.SubagentConfig(
+        name="lead_researcher",
+        description=(
+            "Researches a topic by reading files and delegating fact-checking"
+            " to the 'fact_checker' subagent."
+        ),
+        capabilities=types.SubagentCapabilities(
+            enabled_tools=[
+                types.BuiltinTools.VIEW_FILE,
+                types.BuiltinTools.FIND_FILE,
+                types.BuiltinTools.LIST_DIR,
+                types.BuiltinTools.START_SUBAGENT,
+            ],
+            allowed_subagents=["fact_checker"],
+        ),
+    )
+
+    # Tier 1 (root): The main agent with a session-wide depth ceiling.
+    config = LocalAgentConfig(
+        subagents=[lead_researcher, fact_checker],
+        workspaces=[str(workspace_path)],
+        capabilities=types.CapabilitiesConfig(
+            enable_subagents=True,
+            max_subagent_depth=3,
+            allowed_subagents=["lead_researcher"],
+        ),
+        hooks=[log_pre_tool, log_post_tool],
+    )
+
+    async with Agent(config) as my_agent:
+      prompt = (
+          "Use the 'lead_researcher' subagent to investigate the design and"
+          " performance data in the workspace. The lead_researcher should"
+          " delegate fact-checking of specific claims to 'fact_checker'."
+          " Give me a summary of the architecture and performance profile."
+      )
+      print(f"  User: {prompt}")
+      response = await my_agent.chat(prompt)
+      response_text = await response.text()
+      print(f"\n  Agent:\n{response_text}")
+
+
 async def main() -> None:
   # Configure logging
   root = logging.getLogger()
@@ -214,6 +298,7 @@ async def main() -> None:
 
   await run_dynamic_subagent()
   await run_custom_static_subagent()
+  await run_nested_subagent_hierarchy()
 
 
 if __name__ == "__main__":

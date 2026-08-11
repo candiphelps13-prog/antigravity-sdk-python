@@ -54,3 +54,52 @@ config = LocalAgentConfig(
     ],
 )
 ```
+
+## Hierarchical & Nested Subagents
+
+You can create multi-tier subagent hierarchies where subagents delegate further
+to other subagents. Configure the session-wide depth limit with
+`max_subagent_depth` on `CapabilitiesConfig`, and scope which subagents each
+tier can invoke with `allowed_subagents`:
+
+```python
+from google.antigravity import Agent, LocalAgentConfig, types
+
+# Leaf tier: Can read files but cannot spawn further subagents.
+fact_checker = types.SubagentConfig(
+    name="fact_checker",
+    description="Fact checks claims by verifying data.",
+    capabilities=types.SubagentCapabilities(
+        enabled_tools=[types.BuiltinTools.VIEW_FILE],
+    ),
+)
+
+# Middle tier: Can read files and delegate to fact_checker.
+lead_researcher = types.SubagentConfig(
+    name="lead_researcher",
+    description="Researches a topic and delegates verification to fact_checker.",
+    capabilities=types.SubagentCapabilities(
+        enabled_tools=[
+            types.BuiltinTools.VIEW_FILE,
+            types.BuiltinTools.START_SUBAGENT,
+        ],
+        allowed_subagents=["fact_checker"],
+    ),
+)
+
+# Root agent: Session depth ceiling of 3; initially allowed to invoke lead_researcher.
+config = LocalAgentConfig(
+    subagents=[lead_researcher, fact_checker],
+    capabilities=types.CapabilitiesConfig(
+        enable_subagents=True,
+        max_subagent_depth=3,
+        allowed_subagents=["lead_researcher"],
+    ),
+)
+
+async with Agent(config) as agent:
+    response = await agent.chat(
+        "Use 'lead_researcher' to analyze the report and have 'fact_checker' verify figures."
+    )
+    print(await response.text())
+```

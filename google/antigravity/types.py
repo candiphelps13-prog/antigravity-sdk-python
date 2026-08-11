@@ -175,6 +175,8 @@ class SubagentCapabilities(pydantic.BaseModel):
       makes the agent work collaboratively with a human, asking for
       clarifications and keeping them in the loop if needed. Defaults to
       AgentBehavior.AUTONOMOUS.
+    allowed_subagents: Explicit allowlist of subagent names this subagent may
+      directly invoke. When None, all registered subagents are discoverable.
     enabled_tools: Explicit allowlist of builtin tools to enable. Mutually
       exclusive with disabled_tools. When None, the harness defaults are used.
     disabled_tools: Explicit denylist of builtin tools to disable. Mutually
@@ -182,6 +184,7 @@ class SubagentCapabilities(pydantic.BaseModel):
   """
 
   agent_behavior: AgentBehavior = AgentBehavior.AUTONOMOUS
+  allowed_subagents: list[str] | None = None
   enabled_tools: list[BuiltinTools] | None = None
   disabled_tools: list[BuiltinTools] | None = None
 
@@ -190,6 +193,22 @@ class SubagentCapabilities(pydantic.BaseModel):
     if self.enabled_tools is not None and self.disabled_tools is not None:
       raise ValueError(
           "enabled_tools and disabled_tools should be mutually exclusive."
+      )
+    return self
+
+  @pydantic.model_validator(mode="after")
+  def _validate_subagents_and_tools(self) -> "SubagentCapabilities":
+    subagent_disabled = (
+        self.disabled_tools is not None
+        and BuiltinTools.START_SUBAGENT in self.disabled_tools
+    ) or (
+        self.enabled_tools is not None
+        and BuiltinTools.START_SUBAGENT not in self.enabled_tools
+    )
+    if subagent_disabled and self.allowed_subagents is not None:
+      raise ValueError(
+          "allowed_subagents cannot be specified when START_SUBAGENT is"
+          " disabled or omitted from enabled_tools."
       )
     return self
 
@@ -366,12 +385,11 @@ class CapabilitiesConfig(pydantic.BaseModel):
 
   Attributes:
     enable_subagents: Whether the agent can spawn and delegate to sub-agents.
-    agent_behavior: Operational execution behavior for the agent. In
-      particular, AgentBehavior.AUTONOMOUS incentivizes the agent to solve the
-      task on their own from start to finish while AgentBehavior.INTERACTIVE
-      makes the agent work collaboratively with a human, asking for
-      clarifications and keeping them in the loop if needed. Defaults to
-      AgentBehavior.AUTONOMOUS.
+    agent_behavior: Operational execution behavior for the agent. In particular,
+      AgentBehavior.AUTONOMOUS incentivizes the agent to solve the task on their
+      own from start to finish while AgentBehavior.INTERACTIVE makes the agent
+      work collaboratively with a human, asking for clarifications and keeping
+      them in the loop if needed. Defaults to AgentBehavior.AUTONOMOUS.
     enabled_tools: Explicit allowlist of builtin tools to enable. Mutually
       exclusive with disabled_tools. When None, the harness defaults are used
       (all tools enabled). Disabled tools are removed from the model's context,
@@ -383,6 +401,10 @@ class CapabilitiesConfig(pydantic.BaseModel):
     compaction_threshold: Token count after which the context window may be
       compacted. When None, the backend's default is used.
     finish_tool_schema_json: Optional JSON schema string for the finish tool.
+    max_subagent_depth: Global maximum subagent recursion depth for the session.
+      When None, defaults to 1 (flat single-level delegation).
+    allowed_subagents: Explicit allowlist of subagent names the root agent may
+      directly invoke. When None, all registered subagents are discoverable.
   """
 
   enable_subagents: bool = True
@@ -391,6 +413,8 @@ class CapabilitiesConfig(pydantic.BaseModel):
   disabled_tools: list[BuiltinTools] | None = None
   compaction_threshold: int | None = None
   finish_tool_schema_json: str | None = None
+  max_subagent_depth: int | None = pydantic.Field(default=None, ge=1)
+  allowed_subagents: list[str] | None = None
 
   @pydantic.model_validator(mode="after")
   def _check_mutually_exclusive(self) -> "CapabilitiesConfig":
@@ -398,6 +422,31 @@ class CapabilitiesConfig(pydantic.BaseModel):
       raise ValueError(
           "enabled_tools and disabled_tools should be mutually exclusive."
       )
+    return self
+
+  @pydantic.model_validator(mode="after")
+  def _validate_subagents_and_tools(self) -> "CapabilitiesConfig":
+    subagent_disabled = (
+        not self.enable_subagents
+        or (
+            self.disabled_tools is not None
+            and BuiltinTools.START_SUBAGENT in self.disabled_tools
+        )
+        or (
+            self.enabled_tools is not None
+            and BuiltinTools.START_SUBAGENT not in self.enabled_tools
+        )
+    )
+    if subagent_disabled:
+      if self.max_subagent_depth is not None:
+        raise ValueError(
+            "max_subagent_depth cannot be configured when subagents are"
+            " disabled (enable_subagents=False or START_SUBAGENT not enabled)."
+        )
+      if self.allowed_subagents is not None:
+        raise ValueError(
+            "allowed_subagents cannot be specified when subagents are disabled."
+        )
     return self
 
   @pydantic.model_validator(mode="after")
@@ -814,6 +863,10 @@ class Step(pydantic.BaseModel):
   Attributes:
     id: Unique string identifier for the step.
     step_index: Integer index of the step in the trajectory.
+    trajectory_id: Unique identifier of the trajectory owning this step.
+    parent_trajectory_id: ID of the parent trajectory that spawned this step, or
+      empty string for the root agent conversation.
+    depth: Nesting depth of this step (0 for root conversation).
     type: The high-level type of the step.
     source: The source that generated the step.
     target: The target interacting with this step.
@@ -835,6 +888,9 @@ class Step(pydantic.BaseModel):
 
   id: str = ""
   step_index: int = 0
+  trajectory_id: str = ""
+  parent_trajectory_id: str = ""
+  depth: int = 0
   type: StepType = StepType.UNKNOWN
   source: StepSource = StepSource.UNKNOWN
   target: StepTarget = StepTarget.UNKNOWN

@@ -79,6 +79,43 @@ async with Agent(config=config) as agent:
 > [!NOTE]
 > `agent_behavior` defaults to `AgentBehavior.AUTONOMOUS`. If you enable interactive tools such as `BuiltinTools.ASK_QUESTION` without setting `agent_behavior=AgentBehavior.INTERACTIVE`, a validation warning will be logged.
 
+### Nested Subagents & Depth Controls (`max_subagent_depth`, `allowed_subagents`)
+
+The SDK supports multi-tier hierarchical subagent execution:
+
+-   `max_subagent_depth`: Configures the session-wide subagent recursion depth
+    ceiling on `CapabilitiesConfig` (root conversation is depth 0).
+-   `allowed_subagents`: An explicit allowlist of subagent names that the root
+    agent (on `CapabilitiesConfig`) or a specific subagent (on
+    `SubagentCapabilities`) is permitted to invoke.
+
+```python
+from google.antigravity import Agent, LocalAgentConfig, types
+
+# Configure a subagent that can invoke other subagents
+researcher = types.SubagentConfig(
+    name="researcher",
+    description="Research agent with subagent delegation capability",
+    capabilities=types.SubagentCapabilities(
+        enabled_tools=[
+            types.BuiltinTools.VIEW_FILE,
+            types.BuiltinTools.START_SUBAGENT,
+        ],
+        allowed_subagents=["fact_checker"],
+    ),
+)
+
+# Root agent configured with a max depth of 3
+config = LocalAgentConfig(
+    subagents=[researcher],
+    capabilities=types.CapabilitiesConfig(
+        enable_subagents=True,
+        max_subagent_depth=3,
+        allowed_subagents=["researcher"],
+    ),
+)
+```
+
 ### Gemini Enterprise Agent Platform (formerly Vertex AI) Configuration
 
 To configure the agent to use Gemini Enterprise Agent Platform (formerly Vertex

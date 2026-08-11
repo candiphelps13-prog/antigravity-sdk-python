@@ -89,7 +89,8 @@ relevant information.
     and PDFs, or generating visual content, read
     `examples/getting_started/multimodal.md`.
 -   If the user needs to implement multi-agent delegation, allowing a main agent
-    to spawn and orchestrate subagents for complex tasks, read
+    to spawn and orchestrate subagents, or configure multi-tier nested subagent
+    hierarchies (using `max_subagent_depth` and `allowed_subagents`), read
     `examples/getting_started/subagents.md`.
 -   If the user needs to connect an agent to external services via MCP (Stdio or
     SSE), read `examples/getting_started/mcp_tools.md`.

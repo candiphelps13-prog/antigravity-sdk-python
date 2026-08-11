@@ -1575,6 +1575,42 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
 
     self.assertEqual(config.harness_side_tools, expected_harness_side_tools)
 
+  def test_capabilities_config_max_subagent_depth_and_allowed_subagents(self):
+    """Verifies max_subagent_depth and allowed_subagents map to SubagentsConfig."""
+    strategy = self._make_strategy(
+        capabilities_config=types.CapabilitiesConfig(
+            max_subagent_depth=3,
+            allowed_subagents=["researcher", "reviewer"],
+        )
+    )
+    config = strategy._build_harness_config()
+    self.assertTrue(config.harness_side_tools.subagents.enabled)
+    self.assertEqual(config.harness_side_tools.subagents.max_nesting_depth, 3)
+    self.assertEqual(
+        list(config.harness_side_tools.subagents.allowed_subagents),
+        ["researcher", "reviewer"],
+    )
+
+  def test_build_custom_subagents_protos_nested_subagent_enabled(self):
+    """Verifies custom subagents can have subagents enabled and scoped."""
+    child_subagent = types.SubagentConfig(
+        name="researcher",
+        description="Does research",
+        capabilities=types.SubagentCapabilities(
+            enabled_tools=[types.BuiltinTools.START_SUBAGENT],
+            allowed_subagents=["fact_checker"],
+        ),
+    )
+    strategy = self._make_strategy(subagents=[child_subagent])
+    custom_agents = strategy._build_custom_subagents_protos({})
+    self.assertLen(custom_agents, 1)
+    self.assertEqual(custom_agents[0].name, "researcher")
+    self.assertTrue(custom_agents[0].harness_side_tools.subagents.enabled)
+    self.assertEqual(
+        list(custom_agents[0].harness_side_tools.subagents.allowed_subagents),
+        ["fact_checker"],
+    )
+
   def test_capabilities_config_compaction_threshold(self):
     """Verifies compaction_threshold maps to HarnessConfig.compaction_threshold.
 
@@ -3986,6 +4022,54 @@ class LocalAgentConfigTest(absltest.TestCase):
       )
     self.assertIn("must match [a-zA-Z0-9-]", str(ctx.exception))
 
+  def test_local_agent_config_validates_allowed_subagents_success(self):
+    sub = types.SubagentConfig(
+        name="researcher",
+        description="researcher",
+        system_instructions="research",
+    )
+    config = local_connection_config.LocalAgentConfig(
+        subagents=[sub],
+        capabilities=types.CapabilitiesConfig(
+            allowed_subagents=["researcher"],
+        ),
+    )
+    self.assertEqual(config.capabilities.allowed_subagents, ["researcher"])
+
+  def test_local_agent_config_validates_allowed_subagents_unknown_raises(self):
+    sub = types.SubagentConfig(
+        name="researcher",
+        description="researcher",
+        system_instructions="research",
+    )
+    with self.assertRaisesRegex(
+        pydantic.ValidationError, "Unknown subagent name.*non_existent"
+    ):
+      local_connection_config.LocalAgentConfig(
+          subagents=[sub],
+          capabilities=types.CapabilitiesConfig(
+              allowed_subagents=["non_existent"],
+          ),
+      )
+
+  def test_local_agent_config_validates_subagent_allowed_subagents_unknown_raises(
+      self,
+  ):
+    sub = types.SubagentConfig(
+        name="researcher",
+        description="researcher",
+        capabilities=types.SubagentCapabilities(
+            enabled_tools=[types.BuiltinTools.START_SUBAGENT],
+            allowed_subagents=["ghost_agent"],
+        ),
+    )
+    with self.assertRaisesRegex(
+        pydantic.ValidationError, "Unknown subagent name.*ghost_agent"
+    ):
+      local_connection_config.LocalAgentConfig(
+          subagents=[sub],
+      )
+
   def test_create_strategy_with_mcp_servers(self):
     stdio_cfg = types.McpStdioServer(
         name="my-stdio",
@@ -4511,10 +4595,11 @@ class LocalConnectionSubagentsTest(unittest.IsolatedAsyncioTestCase):
     ):
       strategy._build_harness_config()
 
-  def test_subagent_tools_stripped_and_warned(self):
+  def test_subagent_with_start_subagent_enables_nested_delegation(self):
+    """Verifies subagents with START_SUBAGENT get subagents.enabled=True."""
     subagent = types.SubagentConfig(
         name="nested_helper",
-        description="A subagent trying to use subagents",
+        description="A subagent that can spawn subagents",
         system_instructions="Spawn subagents.",
         capabilities=types.SubagentCapabilities(
             enabled_tools=[types.BuiltinTools.START_SUBAGENT],
@@ -4526,20 +4611,11 @@ class LocalConnectionSubagentsTest(unittest.IsolatedAsyncioTestCase):
         workspaces=[str(self.workspace)],
     )
 
-    with self.assertLogs(level="WARNING") as log_capture:
-      harness_config = strategy._build_harness_config()
-
-    # Verify warning was logged
-    self.assertTrue(
-        any(
-            "Nested subagents are currently not supported" in msg
-            for msg in log_capture.output
-        )
-    )
+    harness_config = strategy._build_harness_config()
 
     self.assertEqual(len(harness_config.custom_subagents), 1)
     custom_agent = harness_config.custom_subagents[0]
-    self.assertFalse(custom_agent.harness_side_tools.subagents.enabled)
+    self.assertTrue(custom_agent.harness_side_tools.subagents.enabled)
     self.assertFalse(custom_agent.harness_side_tools.file_edit.enabled)
 
   def test_local_agent_config_subagents_none_initializes(self):

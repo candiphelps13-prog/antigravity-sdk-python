@@ -194,6 +194,9 @@ class StepTest(unittest.TestCase):
     step = types.Step()
     self.assertEqual(step.id, "")
     self.assertEqual(step.step_index, 0)
+    self.assertEqual(step.trajectory_id, "")
+    self.assertEqual(step.parent_trajectory_id, "")
+    self.assertEqual(step.depth, 0)
     self.assertEqual(step.type, types.StepType.UNKNOWN)
     self.assertEqual(step.status, types.StepStatus.UNKNOWN)
     self.assertEqual(step.source, types.StepSource.UNKNOWN)
@@ -738,6 +741,102 @@ class CapabilitiesConfigTest(unittest.TestCase):
           agent_behavior=types.AgentBehavior.INTERACTIVE,
       )
       mock_warn.assert_not_called()
+
+  def test_max_subagent_depth_and_allowed_subagents(self):
+    """Verifies max_subagent_depth and allowed_subagents on CapabilitiesConfig."""
+    config = types.CapabilitiesConfig(
+        max_subagent_depth=3,
+        allowed_subagents=["researcher", "reviewer"],
+    )
+    self.assertEqual(config.max_subagent_depth, 3)
+    self.assertEqual(config.allowed_subagents, ["researcher", "reviewer"])
+
+  def test_max_subagent_depth_ge_1_enforced(self):
+    """Verifies max_subagent_depth < 1 raises ValidationError."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(max_subagent_depth=0)
+    self.assertIn("greater than or equal to 1", str(cm.exception))
+
+  def test_subagent_capabilities_allowed_subagents(self):
+    """Verifies allowed_subagents on SubagentCapabilities."""
+    caps = types.SubagentCapabilities(allowed_subagents=["fact_checker"])
+    self.assertEqual(caps.allowed_subagents, ["fact_checker"])
+
+  def test_max_subagent_depth_fails_when_subagents_disabled(self):
+    """Verifies ValidationError when max_subagent_depth is set but subagents disabled."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          enable_subagents=False,
+          max_subagent_depth=2,
+      )
+    self.assertIn("max_subagent_depth cannot be configured", str(cm.exception))
+
+  def test_max_subagent_depth_1_fails_when_subagents_disabled(self):
+    """Verifies max_subagent_depth=1 also fails when subagents disabled."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          enable_subagents=False,
+          max_subagent_depth=1,
+      )
+    self.assertIn("max_subagent_depth cannot be configured", str(cm.exception))
+
+  def test_allowed_subagents_fails_when_subagents_disabled(self):
+    """Verifies ValidationError when allowed_subagents is set but subagents disabled."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          enable_subagents=False,
+          allowed_subagents=["worker"],
+      )
+    self.assertIn("allowed_subagents cannot be specified", str(cm.exception))
+
+  def test_allowed_subagents_empty_list_fails_when_subagents_disabled(self):
+    """Verifies ValidationError when allowed_subagents=[] and subagents disabled."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          enable_subagents=False,
+          allowed_subagents=[],
+      )
+    self.assertIn("allowed_subagents cannot be specified", str(cm.exception))
+
+  def test_max_subagent_depth_fails_when_start_subagent_tool_disabled(self):
+    """Verifies ValidationError when START_SUBAGENT is in disabled_tools."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          disabled_tools=[types.BuiltinTools.START_SUBAGENT],
+          max_subagent_depth=3,
+      )
+    self.assertIn("max_subagent_depth cannot be configured", str(cm.exception))
+
+  def test_allowed_subagents_fails_when_start_subagent_tool_disabled(self):
+    """Verifies ValidationError when START_SUBAGENT is in disabled_tools and allowed_subagents is set."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          disabled_tools=[types.BuiltinTools.START_SUBAGENT],
+          allowed_subagents=["worker"],
+      )
+    self.assertIn("allowed_subagents cannot be specified", str(cm.exception))
+
+  def test_max_subagent_depth_fails_when_start_subagent_not_in_enabled_tools(
+      self,
+  ):
+    """Verifies ValidationError when START_SUBAGENT is omitted from enabled_tools."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          enabled_tools=[types.BuiltinTools.VIEW_FILE],
+          max_subagent_depth=2,
+      )
+    self.assertIn("max_subagent_depth cannot be configured", str(cm.exception))
+
+  def test_allowed_subagents_fails_when_start_subagent_not_in_enabled_tools(
+      self,
+  ):
+    """Verifies ValidationError when START_SUBAGENT is omitted from enabled_tools and allowed_subagents is set."""
+    with self.assertRaises(pydantic.ValidationError) as cm:
+      types.CapabilitiesConfig(
+          enabled_tools=[types.BuiltinTools.VIEW_FILE],
+          allowed_subagents=["worker"],
+      )
+    self.assertIn("allowed_subagents cannot be specified", str(cm.exception))
 
   def test_subagent_ask_question_warning_when_not_interactive(self):
     """Verifies that a warning is logged for SubagentCapabilities."""
@@ -1730,6 +1829,33 @@ class SubagentCapabilitiesTest(unittest.TestCase):
       types.SubagentCapabilities(
           enabled_tools=[types.BuiltinTools.EDIT_FILE],
           disabled_tools=[types.BuiltinTools.RUN_COMMAND],
+      )
+
+  def test_allowed_subagents_valid_when_start_subagent_enabled(self):
+    sc = types.SubagentCapabilities(
+        enabled_tools=[types.BuiltinTools.START_SUBAGENT],
+        allowed_subagents=["worker"],
+    )
+    self.assertEqual(sc.allowed_subagents, ["worker"])
+
+  def test_allowed_subagents_raises_when_start_subagent_omitted_from_enabled_tools(
+      self,
+  ):
+    with self.assertRaisesRegex(
+        pydantic.ValidationError, "START_SUBAGENT is disabled or omitted"
+    ):
+      types.SubagentCapabilities(
+          enabled_tools=[types.BuiltinTools.VIEW_FILE],
+          allowed_subagents=["worker"],
+      )
+
+  def test_allowed_subagents_raises_when_start_subagent_in_disabled_tools(self):
+    with self.assertRaisesRegex(
+        pydantic.ValidationError, "START_SUBAGENT is disabled or omitted"
+    ):
+      types.SubagentCapabilities(
+          disabled_tools=[types.BuiltinTools.START_SUBAGENT],
+          allowed_subagents=["worker"],
       )
 
 

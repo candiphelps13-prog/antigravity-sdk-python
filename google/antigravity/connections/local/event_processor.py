@@ -226,7 +226,6 @@ def _parse_stop_reason(
 class LocalConnectionStep(types.Step):
   """Connection-specific step for LocalConnection."""
 
-  trajectory_id: str = ""
   http_code: int = 0
 
   @classmethod
@@ -240,6 +239,8 @@ class LocalConnectionStep(types.Step):
       A new LocalConnectionStep instance.
     """
     traj_id = step_dict.get("trajectory_id", "")
+    parent_traj_id = step_dict.get("parent_trajectory_id", "")
+    depth_val = step_dict.get("depth", 0)
     step_idx = step_dict.get("step_index", 0)
 
     id_str = _make_step_id(traj_id, step_idx)
@@ -363,6 +364,8 @@ class LocalConnectionStep(types.Step):
         id=id_str,
         step_index=step_idx,
         trajectory_id=traj_id,
+        parent_trajectory_id=parent_traj_id,
+        depth=depth_val,
         type=step_type,
         source=source,
         status=status,

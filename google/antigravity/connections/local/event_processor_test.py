@@ -311,6 +311,23 @@ class LocalConnectionStepFromDictTest(absltest.TestCase):
         "/cns/el-d/home/user/workspace/kittens.md",
     )
 
+  def test_step_from_dict_parses_parent_trajectory_id_and_depth(self):
+    """Verifies that from_dict parses parent_trajectory_id and depth."""
+    step = event_processor.LocalConnectionStep.from_dict({
+        "step_index": 5,
+        "trajectory_id": "child_traj_123",
+        "parent_trajectory_id": "parent_traj_456",
+        "depth": 2,
+        "state": "STATE_DONE",
+        "source": "SOURCE_MODEL",
+        "text": "Task finished",
+    })
+    self.assertEqual(step.step_index, 5)
+    self.assertEqual(step.trajectory_id, "child_traj_123")
+    self.assertEqual(step.parent_trajectory_id, "parent_traj_456")
+    self.assertEqual(step.depth, 2)
+    self.assertEqual(step.content, "Task finished")
+
   def test_step_type_tool_call_with_custom_tool(self):
     """Verifies that a step with a custom_tool field is typed TOOL_CALL and parses details."""
     step = event_processor.LocalConnectionStep.from_dict({

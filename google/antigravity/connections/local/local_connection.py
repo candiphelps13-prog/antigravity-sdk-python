@@ -891,14 +891,27 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
   ) -> localharness_pb2.HarnessSideTools:
     active_tools = self._resolve_active_tools(cfg, is_subagent=is_subagent)
     subagent_enabled = False
-    if not is_subagent:
-      subagent_enabled = (
-          getattr(cfg, "enable_subagents", True)
-          and types.BuiltinTools.START_SUBAGENT in active_tools
+    max_depth = None
+    allowed_subagents = []
+
+    if cfg is not None:
+      subagent_enabled = getattr(cfg, "enable_subagents", True) and (
+          types.BuiltinTools.START_SUBAGENT in active_tools
       )
+      max_depth = getattr(cfg, "max_subagent_depth", None)
+      allowed_subagents = cfg.allowed_subagents or []
+    elif not is_subagent:
+      subagent_enabled = types.BuiltinTools.START_SUBAGENT in active_tools
+
+    subagents_proto = localharness_pb2.SubagentsConfig(
+        enabled=subagent_enabled,
+        allowed_subagents=allowed_subagents,
+    )
+    if max_depth is not None:
+      subagents_proto.max_nesting_depth = max_depth
 
     return localharness_pb2.HarnessSideTools(
-        subagents=localharness_pb2.SubagentsConfig(enabled=subagent_enabled),
+        subagents=subagents_proto,
         find=localharness_pb2.FindToolConfig(
             enabled=types.BuiltinTools.FIND_FILE in active_tools
         ),
@@ -944,13 +957,6 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       capabilities = subagent.capabilities or types.SubagentCapabilities(
           enabled_tools=types.BuiltinTools.read_only(),
       )
-
-      active_tools = self._resolve_active_tools(capabilities, is_subagent=True)
-      if types.BuiltinTools.START_SUBAGENT in active_tools:
-        logging.warning(
-            "Nested subagents are currently not supported. Subagent tools will"
-            " be disabled."
-        )
 
       resolved_subagent_tools = []
       for tool in subagent.tools or []:
