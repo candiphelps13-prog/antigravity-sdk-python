@@ -88,6 +88,18 @@ class EventProcessorHelperTest(absltest.TestCase):
   def test_parse_stop_reason(self):
     self.assertEqual(
         event_processor._parse_stop_reason(  # pylint: disable=protected-access
+            localharness_pb2.TrajectoryStateUpdate.STOP_REASON_MAX_MODEL_CALLS_EXCEEDED
+        ),
+        types.StopReason.MAX_MODEL_CALLS_EXCEEDED,
+    )
+    self.assertEqual(
+        event_processor._parse_stop_reason(  # pylint: disable=protected-access
+            localharness_pb2.TrajectoryStateUpdate.STOP_REASON_MAX_TOOL_CALLS_EXCEEDED
+        ),
+        types.StopReason.MAX_TOOL_CALLS_EXCEEDED,
+    )
+    self.assertEqual(
+        event_processor._parse_stop_reason(  # pylint: disable=protected-access
             localharness_pb2.TrajectoryStateUpdate.STOP_REASON_QUOTA_EXHAUSTED
         ),
         types.StopReason.QUOTA_EXHAUSTED,

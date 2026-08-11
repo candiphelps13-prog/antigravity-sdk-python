@@ -94,6 +94,7 @@ message HarnessConfig {
   .antigravity.localharness.RetryConfig retry_config = 20;
   .antigravity.localharness.PolicyConfig policy_config = 21;
   .antigravity.localharness.AgentBehavior agent_behavior = 22;
+  .antigravity.localharness.BudgetConfig budget_config = 23;
   extensions 1000 to 1999;
   extensions 2000 to max;
 }
@@ -482,6 +483,8 @@ message TrajectoryStateUpdate {
   }
   enum StopReason {
     STOP_REASON_UNSPECIFIED = 0;
+    STOP_REASON_MAX_MODEL_CALLS_EXCEEDED = 1;
+    STOP_REASON_MAX_TOOL_CALLS_EXCEEDED = 2;
     STOP_REASON_QUOTA_EXHAUSTED = 6;
   }
   string trajectory_id = 2;
@@ -713,4 +716,8 @@ message PolicyDecisionResponse {
   string request_id = 1;
   .antigravity.localharness.PolicyEvaluationOutcome outcome = 2;
   string deny_reason = 3;
+}
+message BudgetConfig {
+  int32 max_model_calls = 1;
+  int32 max_tool_calls = 2;
 }

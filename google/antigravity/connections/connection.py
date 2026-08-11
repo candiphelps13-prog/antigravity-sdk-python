@@ -73,6 +73,7 @@ class AgentConfig(abc.ABC, pydantic.BaseModel):
   # Optional retry configuration. Supported by Local, RemoteWebsocket, and JPv2
   # (AntigravityProdActor) connection strategies; ignored by deprecated JPv1.
   retry_config: types.RetryConfig | None = None
+  budget_config: types.BudgetConfig | None = None
 
   @pydantic.field_validator("debug_config", mode="before")
   @classmethod

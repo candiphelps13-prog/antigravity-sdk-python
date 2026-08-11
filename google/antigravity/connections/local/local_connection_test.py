@@ -2067,6 +2067,26 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     config_empty = strategy_empty._build_harness_config()
     self.assertFalse(config_empty.HasField("retry_config"))
 
+  def test_budget_config_proto(self):
+    """Verifies that budget_config translates to proto correctly."""
+    strategy_none = self._make_strategy(budget_config=None)
+    config_none = strategy_none._build_harness_config()
+    self.assertFalse(config_none.HasField("budget_config"))
+
+    strategy_empty = self._make_strategy(budget_config=types.BudgetConfig())
+    config_empty = strategy_empty._build_harness_config()
+    self.assertFalse(config_empty.HasField("budget_config"))
+
+    budget_cfg = types.BudgetConfig(
+        max_model_calls=5,
+        max_tool_calls=10,
+    )
+    strategy = self._make_strategy(budget_config=budget_cfg)
+    config = strategy._build_harness_config()
+    self.assertTrue(config.HasField("budget_config"))
+    self.assertEqual(config.budget_config.max_model_calls, 5)
+    self.assertEqual(config.budget_config.max_tool_calls, 10)
+
   def test_retry_config_api_retry_only(self):
     """Verifies translation when only api_retry is configured."""
     retry_cfg = types.RetryConfig(

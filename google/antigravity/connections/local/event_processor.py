@@ -195,6 +195,12 @@ def parse_usage_metadata(
 
 
 _STOP_REASON_MAP = {
+    localharness_pb2.TrajectoryStateUpdate.StopReason.STOP_REASON_MAX_MODEL_CALLS_EXCEEDED: (
+        types.StopReason.MAX_MODEL_CALLS_EXCEEDED
+    ),
+    localharness_pb2.TrajectoryStateUpdate.StopReason.STOP_REASON_MAX_TOOL_CALLS_EXCEEDED: (
+        types.StopReason.MAX_TOOL_CALLS_EXCEEDED
+    ),
     localharness_pb2.TrajectoryStateUpdate.StopReason.STOP_REASON_QUOTA_EXHAUSTED: (
         types.StopReason.QUOTA_EXHAUSTED
     ),

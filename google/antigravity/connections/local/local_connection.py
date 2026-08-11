@@ -144,6 +144,18 @@ def build_retry_config_proto(
   return proto
 
 
+def build_budget_config_proto(
+    config: types.BudgetConfig | None,
+) -> localharness_pb2.BudgetConfig | None:
+  """Builds a BudgetConfig proto from a BudgetConfig model."""
+  if not config:
+    return None
+  data = config.model_dump(exclude_none=True)
+  if not data:
+    return None
+  return localharness_pb2.BudgetConfig(**data)
+
+
 def build_models_proto(
     models: list[types.ModelTarget],
 ) -> list[localharness_pb2.ModelConfig]:
@@ -778,6 +790,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       subagents: list[types.SubagentConfig] | None = None,
       debug_config: connection.DebugConfig | None = None,
       retry_config: types.RetryConfig | None = None,
+      budget_config: types.BudgetConfig | None = None,
       policies: list[policy.Policy] | None = None,
   ):
     """Initializes the instance.
@@ -799,6 +812,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       subagents: Optional list of static subagent configurations.
       debug_config: Optional debug configuration for the connection.
       retry_config: Optional retry configuration for model API and outputs.
+      budget_config: Optional session budget configuration.
       policies: Optional list of policy rules for the Go evaluator.
     """
     self._binary_path = _get_default_binary_path()
@@ -811,6 +825,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
     self._env = env
     self._debug_config = debug_config
     self._retry_config = retry_config
+    self._budget_config = budget_config
     self._policies = policies or []
     # Maps rule_id -> Policy for dynamic rules evaluated during tool execution.
     self._dynamic_policy_map: dict[str, policy.Policy] = {}
@@ -1048,6 +1063,11 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       retry_proto = build_retry_config_proto(self._retry_config)
       if retry_proto:
         harness_config.retry_config.CopyFrom(retry_proto)
+
+    if self._budget_config:
+      budget_proto = build_budget_config_proto(self._budget_config)
+      if budget_proto:
+        harness_config.budget_config.CopyFrom(budget_proto)
 
     if self._policies:
       policy_config, self._dynamic_policy_map = policy._to_policy_config_proto(

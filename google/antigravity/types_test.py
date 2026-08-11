@@ -1873,6 +1873,14 @@ class BudgetEnforcementTypesTest(absltest.TestCase):
 
   def test_stop_reason_enum(self):
     self.assertEqual(types.StopReason.UNSPECIFIED, "UNSPECIFIED")
+    self.assertEqual(
+        types.StopReason.MAX_MODEL_CALLS_EXCEEDED,
+        "MAX_MODEL_CALLS_EXCEEDED",
+    )
+    self.assertEqual(
+        types.StopReason.MAX_TOOL_CALLS_EXCEEDED,
+        "MAX_TOOL_CALLS_EXCEEDED",
+    )
     self.assertEqual(types.StopReason.QUOTA_EXHAUSTED, "QUOTA_EXHAUSTED")
 
   def test_chat_response_stop_reason(self):
@@ -1886,6 +1894,20 @@ class BudgetEnforcementTypesTest(absltest.TestCase):
         response.stop_reason,
         types.StopReason.QUOTA_EXHAUSTED,
     )
+
+  def test_budget_config_validation(self):
+    config = types.BudgetConfig(
+        max_model_calls=5,
+        max_tool_calls=10,
+    )
+    self.assertEqual(config.max_model_calls, 5)
+    self.assertEqual(config.max_tool_calls, 10)
+
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_model_calls=0)
+
+    with self.assertRaises(pydantic.ValidationError):
+      types.BudgetConfig(max_tool_calls=-1)
 
 
 if __name__ == "__main__":

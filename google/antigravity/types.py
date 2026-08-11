@@ -74,6 +74,7 @@ __all__ = [
     "StepSource",
     "StepTarget",
     "StepStatus",
+    "BudgetConfig",
     "StopReason",
     "Step",
     "HookResult",
@@ -415,6 +416,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
     return self
 
 
+_MAX_INT32 = 2**31 - 1  # Maximum value for protobuf int32 wire fields
 _MAX_UINT32 = 2**32 - 1  # Maximum value for protobuf uint32 wire fields
 
 
@@ -745,15 +747,37 @@ class SessionContinuationMode(str, enum.Enum):
   CREATE_ONLY = "create_only"
 
 
+class BudgetConfig(pydantic.BaseModel):
+  """Configuration for session-level budget limits and caps.
+
+  Attributes:
+    max_model_calls: Maximum number of model invocations (reasoning steps /
+      generator calls) permitted across the session.
+    max_tool_calls: Maximum number of tool invocations permitted across the
+      session, regardless of tool source.
+  """
+
+  max_model_calls: int | None = pydantic.Field(
+      default=None, ge=1, le=_MAX_INT32
+  )
+  max_tool_calls: int | None = pydantic.Field(default=None, ge=1, le=_MAX_INT32)
+
+
 class StopReason(str, enum.Enum):
   """Reason why the execution turn stopped.
 
   Attributes:
     UNSPECIFIED: Default value; normal completion or unspecified stop reason.
+    MAX_MODEL_CALLS_EXCEEDED: Turn halted because session exceeded configured
+      max_model_calls.
+    MAX_TOOL_CALLS_EXCEEDED: Turn halted because session exceeded
+      max_tool_calls.
     QUOTA_EXHAUSTED: Turn halted because backend model API quota was exhausted.
   """
 
   UNSPECIFIED = "UNSPECIFIED"
+  MAX_MODEL_CALLS_EXCEEDED = "MAX_MODEL_CALLS_EXCEEDED"
+  MAX_TOOL_CALLS_EXCEEDED = "MAX_TOOL_CALLS_EXCEEDED"
   QUOTA_EXHAUSTED = "QUOTA_EXHAUSTED"
 
 
