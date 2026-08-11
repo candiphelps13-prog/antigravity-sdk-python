@@ -47,7 +47,12 @@ The essential building blocks for initializing, configuring, and prompting agent
 * [prioritized_inference.py](prioritized_inference.py): Configuring Gemini Prioritized Inference (`service_tier="priority"`) and monitoring server-side rate limit downgrades.
 
 ### 🛡️ Safety & Governance
-Securing agent actions and keeping humans in control before executing external tools.
+Securing agent actions, enforcing operational/token budgets, and keeping
+humans in control before executing external tools.
+
+* [budget_limits.py](budget_limits.py): Enforcing session operational limits
+  (model calls, tool calls) and proactive token budget controls (input, output,
+  and total tokens) with stop reason inspection.
 * [policies.py](policies.py): Implementing robust safety policies ("Deny by Default", allowlisting, and `ask_user`).
 * [human_in_the_loop.py](human_in_the_loop.py): Interactively pausing execution to request human confirmation or input.
 

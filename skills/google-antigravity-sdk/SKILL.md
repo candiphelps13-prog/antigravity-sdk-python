@@ -117,6 +117,10 @@ relevant information.
     `examples/getting_started/web_tools.md`. (Note: when fetching massive web
     pages or articles, pair `read_url_content` with `view_file` to inspect
     cached disk files).
+-   If the user needs to enforce session operational limits (model or
+    tool calls) or proactive token budget controls (input, output, or
+    total tokens) and handle `StopReason`, read
+    `examples/getting_started/budget_limits.md`.
 -   If the user needs to set up and run a local model agent (LiteRT with Gemma,
     or an OpenAI-compatible server like Ollama), including model download,
     hardware requirements, and context window configuration, read

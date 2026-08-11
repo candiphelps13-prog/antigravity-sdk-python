@@ -238,3 +238,20 @@ config = LocalAgentConfig(
 )
 ```
 
+### Session Budget Controls & Stop Reasons
+
+You can configure session operational limits (`max_model_calls`, `max_tool_calls`) and proactive token budget controls (`max_input_tokens`, `max_output_tokens`, `max_total_tokens`) using `BudgetConfig`:
+
+```python
+from google.antigravity import Agent, LocalAgentConfig, types
+
+config = LocalAgentConfig(
+    budget_config=types.BudgetConfig(
+        max_model_calls=10,
+        max_tool_calls=20,
+        max_total_tokens=100_000,
+    ),
+)
+```
+
+For a full guide and multi-turn stop reason handling examples, see [budget_limits.md](../../examples/getting_started/budget_limits.md).
