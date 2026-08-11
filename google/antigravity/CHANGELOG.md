@@ -7,6 +7,36 @@ All notable changes to the Google Antigravity Python SDK will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.11] - 2026-08-11
+
+The 0.1.11 release updates the default model to `gemini-3.7-flash`, introduces session-level budget enforcement and turn termination stop reasons, Vertex AI Express Mode authentication and a new agent behavior setting that toggles betweein interactive and autonomous (the default). It also expands tool hook metadata, resolves string annotation coercion for postponed evaluation, and improves MCP server and subagent stability.
+
+### 🌟 Key Highlights
+
+- **Default Model Upgrade to Gemini 3.7 Flash**: Upgraded the default inference model to `gemini-3.7-flash`.
+- **Session Budget Enforcement & Stop Reasons**: Added `BudgetConfig` to define session-level usage limits (total tokens, turns, and cost) and `StopReason` enum (`BUDGET_EXCEEDED`, `TURN_LIMIT`, `USER_CANCELLED`, etc.) to inspect turn termination causes.
+- **Vertex AI Express Mode Support**: Added native support for Express Mode authentication via `VertexEndpoint(api_key=...)` and `LocalAgentConfig(vertex=true, api_key=...)`, simplifying headless and non-GCP deployments.
+- **Autonomous Agent Behavior Mode**: Control the agent's behavior with `AgentBehavior`. By default the SDK now has a `AgentBehavior.AUTONOMOUS` mode (used to be `AgentBehavior.INTERACTIVE`) to streamline scripting, background and headless interactions modes.
+- **Multi-Interface Hook Registration**: Enabled single-instance registration across multiple hook interfaces (`PreToolHook`, `PostToolHook`, `PreTurnHook`), allowing for cross functional instrumentation.
+
+### 🔧 Detailed Changes
+
+#### New Features
+- **Budget Enforcement**: Introduced `BudgetConfig(max_total_tokens, max_turns, max_cost_usd)` and exposed stop reason metadata on turn responses.
+- **Express Mode API Key Auth**: Added `api_key` support across `VertexEndpoint` and local agent configurations.
+- **Multi-Interface Hooks**: Supported registering composite hook classes without duplicate invocation.
+- **PreToolArgs Metadata**: Exposed `trajectory_id` and `step_index` on tool hook payloads for chat thread context tracing.
+
+#### Model & Default Changes
+- **Default Model Upgrade**: Updated the default model from `gemini-3.6-flash` to `gemini-3.7-flash`.
+- **Agent Behavior**: Introduced the ability to control `AgentBehavior`. Now defaults to autonomous (form interactive) to avoid unexpected interactive pause states during script execution. Override by setting `CapabilitiesConfig(agent_behavior=AgentBehavior.INTERACTIVE)`.
+
+#### Bug Fixes & Maintenance
+- **ToolRunner String Annotation Coercion**: When using `from __future__ import annotations`, tool argument coercion failed on stringified types; resolved by resolving type annotations via `typing.get_type_hints` before type adaptation.
+- **MCP Server Example Port Binding**: Ephemeral port race conditions in test and example server startup were resolved by binding directly to port 0.
+- **Subagent Deadlock Prevention**: Handled subagent fatal errors in the localagent executor to prevent deadlocks when subagents terminate abnormally.
+- **Empty Input Validation**: Added input validation to prevent SDK unresponsiveness on empty or whitespace-only prompts.
+
 ## [0.1.10] - 2026-08-04
 
 The 0.1.10 release introduces support for Gemini Prioritized Inference service tiers, real-time token usage event streaming, stateful context-aware hook decorators, and explicit tool call correlation IDs across hook callbacks. It also standardizes default system instruction merging behavior, fixes WebSocket compaction events, and expands local Gemma model documentation.
