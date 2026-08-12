@@ -150,9 +150,18 @@ message VideoContent {
     TYPE_3GPP = 9;
     TYPE_YT_BEYOND = 10;
   }
+  enum Processing {
+    PROCESSING_UNSPECIFIED = 0;
+    STATIC = 1;
+    AGENTIC = 2;
+  }
   oneof data_or_uri {
     bytes data = 2;
     string uri = 6;
+  }
+  oneof processing {
+    .genai.VideoContent.Processing processing_type = 17;
+    .genai.VideoContent.MediaProcessing processing_config = 18;
   }
   .genai.VideoContent.MimeType mime_type = 1
       [json_name = "legacy_mime_type_enum"];
