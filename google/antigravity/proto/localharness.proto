@@ -38,6 +38,14 @@ enum ModelType {
   MODEL_TYPE_TEXT = 1;
   MODEL_TYPE_IMAGE = 2;
 }
+enum Modality {
+  MODALITY_UNSPECIFIED = 0;
+  TEXT = 1;
+  IMAGE = 2;
+  VIDEO = 3;
+  AUDIO = 4;
+  DOCUMENT = 5;
+}
 enum PolicyDecision {
   POLICY_DECISION_UNSPECIFIED = 0;
   POLICY_DECISION_ALLOW = 1;
@@ -553,6 +561,10 @@ message Media {
   string description = 2;
   bytes data = 3;
 }
+message ModalityTokenCount {
+  .antigravity.localharness.Modality modality = 1;
+  uint64 token_count = 2;
+}
 message UsageMetadata {
   uint64 prompt_token_count = 1;
   uint64 cached_content_token_count = 5;
@@ -560,6 +572,14 @@ message UsageMetadata {
   uint64 thoughts_token_count = 4;
   uint64 total_token_count = 3;
   string service_tier = 6;
+  repeated .antigravity.localharness.ModalityTokenCount prompt_tokens_details =
+      7;
+  repeated .antigravity.localharness.ModalityTokenCount cache_tokens_details =
+      8;
+  repeated .antigravity.localharness.ModalityTokenCount
+      candidates_tokens_details = 9;
+  repeated .antigravity.localharness.ModalityTokenCount
+      tool_use_prompt_tokens_details = 10;
 }
 message McpServerConfig {
   enum AuthProviderType {
