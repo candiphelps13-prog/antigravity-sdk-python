@@ -349,6 +349,7 @@ message ActionGenerateImage {
   repeated string image_paths = 2;
   string image_name = 3;
   string aspect_ratio = 4;
+  string output_path = 5;
 }
 message ActionSearchWeb {
   string query = 1;

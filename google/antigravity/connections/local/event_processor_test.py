@@ -23,6 +23,7 @@ from google.protobuf import json_format
 from google.antigravity.proto import localharness_pb2
 from google.antigravity import types
 from google.antigravity.connections.local import event_processor
+from google.antigravity.connections.local import types as local_types
 
 
 MAIN_TRAJECTORY_ID = "cbb3a5135a32671ae8152a25a857c4bc"
@@ -229,6 +230,50 @@ class LocalConnectionStepFromDictTest(absltest.TestCase):
     self.assertEqual(step.tool_calls[0].name, "view_file")
     self.assertEqual(step.tool_calls[0].args, {"file_path": "/foo"})
     self.assertEqual(step.tool_calls[0].canonical_path, "/foo")
+
+  def test_step_type_tool_call_with_generate_image_normalizes_output_path(self):
+    """Verifies that a step with generate_image built-in tool normalizes output_path."""
+    step = event_processor.LocalConnectionStep.from_dict({
+        "source": "SOURCE_MODEL",
+        "state": "STATE_DONE",
+        "generate_image": {
+            "prompt": "A sunset",
+            "image_name": "sunset",
+            "aspect_ratio": "16:9",
+            "output_path": "file:///tmp/sunset_123.png",
+        },
+    })
+    self.assertEqual(step.type, types.StepType.TOOL_CALL)
+    self.assertLen(step.tool_calls, 1)
+    self.assertEqual(step.tool_calls[0].name, "generate_image")
+    self.assertEqual(
+        step.tool_calls[0].args,
+        {
+            "prompt": "A sunset",
+            "image_name": "sunset",
+            "aspect_ratio": "16:9",
+            "output_path": "/tmp/sunset_123.png",
+        },
+    )
+    self.assertEqual(step.tool_calls[0].canonical_path, "/tmp/sunset_123.png")
+
+  def test_generate_image_result_model_output_path(self):
+    """Verifies GenerateImageResult field and string output formatting."""
+    res = local_types.GenerateImageResult(
+        image_name="sunset",
+        aspect_ratio="16:9",
+        output_path="/tmp/sunset_123.png",
+    )
+    self.assertEqual(res.image_name, "sunset")
+    self.assertEqual(res.aspect_ratio, "16:9")
+    self.assertEqual(res.output_path, "/tmp/sunset_123.png")
+    self.assertEqual(str(res), "/tmp/sunset_123.png")
+
+  def test_generate_image_result_model_fallback_str(self):
+    res = local_types.GenerateImageResult(
+        image_name="sunset", aspect_ratio="16:9"
+    )
+    self.assertEqual(str(res), "sunset")
 
   def test_structured_output_extracted_from_finish(self):
     """Verifies that structured output is extracted when finish payload is present.

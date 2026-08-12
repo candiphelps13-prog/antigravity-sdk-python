@@ -86,11 +86,27 @@ class EditFileResult(pydantic.BaseModel):
 class GenerateImageResult(pydantic.BaseModel):
   """Structured result from a generate_image tool execution."""
 
-  image_name: str = ""
-  aspect_ratio: str = ""
+  image_name: str = pydantic.Field(
+      default="",
+      description="Base requested filename prefix for the image artifact.",
+  )
+  aspect_ratio: str = pydantic.Field(
+      default="",
+      description=(
+          "Requested aspect ratio for the generated image (e.g. '16:9', '1:1')."
+      ),
+  )
+  output_path: str = pydantic.Field(
+      default="",
+      description=(
+          "Platform-native local filesystem path where the generated output"
+          " image artifact was saved on disk. Empty if generation failed or no"
+          " file output was written."
+      ),
+  )
 
   def __str__(self) -> str:
-    return self.image_name
+    return self.output_path or self.image_name
 
 
 class SearchWebResult(pydantic.BaseModel):

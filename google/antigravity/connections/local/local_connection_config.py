@@ -61,7 +61,7 @@ PROTO_FIELD_TO_SDK_NAME: dict[str, str] = {
 # Argument keys in tool call JSON payloads that carry wire-format URIs
 # (file:///..., cns://...) and must be normalized to clean filesystem paths.
 WIRE_PATH_ARGUMENT_KEYS: frozenset[str] = frozenset(
-    {"path", "file_path", "directory_path", "TargetFile"}
+    {"path", "file_path", "directory_path", "TargetFile", "output_path"}
 )
 
 
