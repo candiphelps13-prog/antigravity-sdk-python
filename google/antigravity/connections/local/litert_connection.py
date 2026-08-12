@@ -242,6 +242,9 @@ class LiteRTConnectionStrategy(
         with _urlopen_no_proxy(
             f"{self._openai_server_url}/v1/models", timeout=0.5
         ) as r:
+          # Drain the response body so the socket closes cleanly without
+          # triggering abortive TCP RST frames (WinError 10054) on Windows.
+          r.read()
           status = r.status
           logging.debug(
               "LiteRTConnectionStrategy __aenter__: _ping response status: %s",

@@ -14,8 +14,10 @@
 
 """Unit tests for LiteRTConnectionStrategy and LiteRTAgentConfig."""
 
+import http.server
 import json
 import logging
+import socketserver
 import sys
 from typing import Any
 import unittest
@@ -788,6 +790,118 @@ class LiteRTConnectionTest(unittest.IsolatedAsyncioTestCase):
     finally:
       if orig_attr is not None:
         setattr(local_pkg, "litert_connection", orig_attr)
+
+  def test_litert_server_handle_error_connection_reset(self):
+    """Verify handle_error suppresses reset errors and delegates others."""
+    server = litert_connection.litert_server.LiteRTOpenAIServer(
+        ("127.0.0.1", 0),
+        litert_connection.litert_server.LiteRTOpenAIHandler,
+        engine=mock.MagicMock(),
+        model_name="test-model",
+    )
+    try:
+      with (
+          mock.patch("sys.exc_info") as mock_exc_info,
+          mock.patch.object(
+              socketserver.BaseServer, "handle_error"
+          ) as mock_super_handle_error,
+      ):
+        # 1. ConnectionResetError is suppressed
+        err = ConnectionResetError(
+            "[WinError 10054] An existing connection was forcibly closed by the"
+            " remote host"
+        )
+        mock_exc_info.return_value = (ConnectionResetError, err, None)
+        server.handle_error(mock.MagicMock(), ("127.0.0.1", 12345))
+        mock_super_handle_error.assert_not_called()
+
+        # 2. Windows OSError (winerror=10054) is suppressed
+        win_err_10054 = OSError()
+        win_err_10054.winerror = 10054
+        mock_exc_info.return_value = (OSError, win_err_10054, None)
+        server.handle_error(mock.MagicMock(), ("127.0.0.1", 12345))
+        mock_super_handle_error.assert_not_called()
+
+        # 3. Windows OSError (winerror=10053) is suppressed
+        win_err_10053 = OSError()
+        win_err_10053.winerror = 10053
+        mock_exc_info.return_value = (OSError, win_err_10053, None)
+        server.handle_error(mock.MagicMock(), ("127.0.0.1", 12345))
+        mock_super_handle_error.assert_not_called()
+
+        # 4. Unrelated error (e.g. ValueError) delegates to super().handle_error
+        val_err = ValueError("Unrelated server failure")
+        mock_exc_info.return_value = (ValueError, val_err, None)
+        req = mock.MagicMock()
+        client_addr = ("127.0.0.1", 12345)
+        server.handle_error(req, client_addr)
+        mock_super_handle_error.assert_called_once_with(req, client_addr)
+    finally:
+      server.server_close()
+
+  def test_litert_handler_handle_connection_reset(self):
+    """Verify LiteRTOpenAIHandler.handle handles reset errors and re-raises others."""
+    handler = mock.MagicMock(
+        spec=litert_connection.litert_server.LiteRTOpenAIHandler
+    )
+
+    # 1. ConnectionResetError sets close_connection = True
+    handler.close_connection = False
+    with mock.patch.object(
+        http.server.BaseHTTPRequestHandler,
+        "handle",
+        side_effect=ConnectionResetError,
+    ):
+      litert_connection.litert_server.LiteRTOpenAIHandler.handle(handler)
+      self.assertTrue(handler.close_connection)
+
+    # 2. OSError with winerror 10054 sets close_connection = True
+    handler.close_connection = False
+    win_err_10054 = OSError()
+    win_err_10054.winerror = 10054
+    with mock.patch.object(
+        http.server.BaseHTTPRequestHandler,
+        "handle",
+        side_effect=win_err_10054,
+    ):
+      litert_connection.litert_server.LiteRTOpenAIHandler.handle(handler)
+      self.assertTrue(handler.close_connection)
+
+    # 3. OSError with winerror 10053 sets close_connection = True
+    handler.close_connection = False
+    win_err_10053 = OSError()
+    win_err_10053.winerror = 10053
+    with mock.patch.object(
+        http.server.BaseHTTPRequestHandler,
+        "handle",
+        side_effect=win_err_10053,
+    ):
+      litert_connection.litert_server.LiteRTOpenAIHandler.handle(handler)
+      self.assertTrue(handler.close_connection)
+
+    # 4. Unrelated OSError (winerror=10050) is re-raised
+    handler.close_connection = False
+    win_err_other = OSError()
+    win_err_other.winerror = 10050
+    with mock.patch.object(
+        http.server.BaseHTTPRequestHandler,
+        "handle",
+        side_effect=win_err_other,
+    ):
+      with self.assertRaises(OSError):
+        litert_connection.litert_server.LiteRTOpenAIHandler.handle(handler)
+      self.assertFalse(handler.close_connection)
+
+    # 5. Non-OSError exception (e.g. ValueError) is re-raised
+    handler.close_connection = False
+    with mock.patch.object(
+        http.server.BaseHTTPRequestHandler,
+        "handle",
+        side_effect=ValueError("Unexpected"),
+    ):
+      with self.assertRaises(ValueError):
+        litert_connection.litert_server.LiteRTOpenAIHandler.handle(handler)
+      self.assertFalse(handler.close_connection)
 
 
 if __name__ == "__main__":
