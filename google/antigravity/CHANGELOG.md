@@ -7,6 +7,10 @@ All notable changes to the Google Antigravity Python SDK will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.12] - 2026-08-13
+
+This release fixes a regression: https://github.com/google-antigravity/antigravity-sdk-python/issues/172
+
 ## [0.1.11] - 2026-08-11
 
 The 0.1.11 release updates the default model to `gemini-3.7-flash`, introduces session-level budget enforcement and turn termination stop reasons, Vertex AI Express Mode authentication and a new agent behavior setting that toggles betweein interactive and autonomous (the default). It also expands tool hook metadata, resolves string annotation coercion for postponed evaluation, and improves MCP server and subagent stability.
