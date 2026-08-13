@@ -241,6 +241,9 @@ def _is_context_parameter(param: inspect.Parameter) -> bool:
   annotation = param.annotation
   if annotation is inspect.Parameter.empty:
     return False
+  # Note: Exact HookContext matching is used rather than subclass inheritance
+  # to avoid maintaining a list of derived types, as current scoping makes exact
+  # matching sufficient.
   if annotation == HookContext:
     return True
   if isinstance(annotation, str):
