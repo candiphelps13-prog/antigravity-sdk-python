@@ -231,6 +231,7 @@ message FindToolConfig {
 message RunCommandToolConfig {
   bool enabled = 1;
   uint32 max_timeout_ms = 2;
+  bool enable_daemon_commands = 3;
 }
 message SubagentsConfig {
   bool enabled = 1;

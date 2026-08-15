@@ -1560,7 +1560,9 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
         view_file=localharness_pb2.ViewFileToolConfig(enabled=True),
         subagents=localharness_pb2.SubagentsConfig(enabled=False),
         user_questions=localharness_pb2.UserQuestionsConfig(enabled=False),
-        run_command=localharness_pb2.RunCommandToolConfig(enabled=False),
+        run_command=localharness_pb2.RunCommandToolConfig(
+            enabled=False, enable_daemon_commands=False
+        ),
         find=localharness_pb2.FindToolConfig(enabled=False),
         generate_image=localharness_pb2.GenerateImageToolConfig(enabled=False),
         file_edit=localharness_pb2.FileEditToolConfig(enabled=False),
@@ -1574,6 +1576,36 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     )
 
     self.assertEqual(config.harness_side_tools, expected_harness_side_tools)
+
+  def test_capabilities_config_enable_daemon_commands_custom(self):
+    """Verifies enable_daemon_commands maps to RunCommandToolConfig."""
+    strategy_false = self._make_strategy(
+        capabilities_config=types.CapabilitiesConfig(
+            enable_daemon_commands=False,
+        )
+    )
+    config_false = strategy_false._build_harness_config()
+    self.assertFalse(
+        config_false.harness_side_tools.run_command.enable_daemon_commands
+    )
+
+    strategy_true = self._make_strategy(
+        capabilities_config=types.CapabilitiesConfig(
+            enable_daemon_commands=True,
+        )
+    )
+    config_true = strategy_true._build_harness_config()
+    self.assertTrue(
+        config_true.harness_side_tools.run_command.enable_daemon_commands
+    )
+
+  def test_build_harness_config_defaults_enable_daemon_commands(self):
+    """Verifies enable_daemon_commands defaults to False when capabilities_config is None."""
+    strategy = self._make_strategy(capabilities_config=None)
+    config = strategy._build_harness_config()
+    self.assertFalse(
+        config.harness_side_tools.run_command.enable_daemon_commands
+    )
 
   def test_capabilities_config_max_subagent_depth_and_allowed_subagents(self):
     """Verifies max_subagent_depth and allowed_subagents map to SubagentsConfig."""

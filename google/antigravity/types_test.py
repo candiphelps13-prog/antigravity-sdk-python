@@ -757,6 +757,14 @@ class CapabilitiesConfigTest(unittest.TestCase):
       types.CapabilitiesConfig(max_subagent_depth=0)
     self.assertIn("greater than or equal to 1", str(cm.exception))
 
+  def test_enable_daemon_commands_default_and_custom(self):
+    """Verifies enable_daemon_commands defaults to False and can be set to True."""
+    config_default = types.CapabilitiesConfig()
+    self.assertFalse(config_default.enable_daemon_commands)
+
+    config_custom = types.CapabilitiesConfig(enable_daemon_commands=True)
+    self.assertTrue(config_custom.enable_daemon_commands)
+
   def test_subagent_capabilities_allowed_subagents(self):
     """Verifies allowed_subagents on SubagentCapabilities."""
     caps = types.SubagentCapabilities(allowed_subagents=["fact_checker"])

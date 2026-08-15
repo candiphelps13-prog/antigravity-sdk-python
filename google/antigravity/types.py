@@ -405,6 +405,11 @@ class CapabilitiesConfig(pydantic.BaseModel):
       When None, defaults to 1 (flat single-level delegation).
     allowed_subagents: Explicit allowlist of subagent names the root agent may
       directly invoke. When None, all registered subagents are discoverable.
+    enable_daemon_commands: Whether the agent is authorized to start
+      long-running daemon commands (e.g. background dev servers, watchers)
+      using run_command(IsDaemon=True) without blocking session completion.
+      When True, the IsDaemon argument is exposed on the run_command tool
+      schema. Defaults to False.
   """
 
   enable_subagents: bool = True
@@ -415,6 +420,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
   finish_tool_schema_json: str | None = None
   max_subagent_depth: int | None = pydantic.Field(default=None, ge=1)
   allowed_subagents: list[str] | None = None
+  enable_daemon_commands: bool = False
 
   @pydantic.model_validator(mode="after")
   def _check_mutually_exclusive(self) -> "CapabilitiesConfig":

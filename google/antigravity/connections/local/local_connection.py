@@ -910,6 +910,12 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
     if max_depth is not None:
       subagents_proto.max_nesting_depth = max_depth
 
+    enable_daemon = (
+        getattr(cfg, "enable_daemon_commands", False)
+        if cfg is not None
+        else False
+    )
+
     return localharness_pb2.HarnessSideTools(
         subagents=subagents_proto,
         find=localharness_pb2.FindToolConfig(
@@ -919,7 +925,8 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
             enabled=types.BuiltinTools.ASK_QUESTION in active_tools
         ),
         run_command=localharness_pb2.RunCommandToolConfig(
-            enabled=types.BuiltinTools.RUN_COMMAND in active_tools
+            enabled=types.BuiltinTools.RUN_COMMAND in active_tools,
+            enable_daemon_commands=enable_daemon,
         ),
         file_edit=localharness_pb2.FileEditToolConfig(
             enabled=types.BuiltinTools.EDIT_FILE in active_tools
