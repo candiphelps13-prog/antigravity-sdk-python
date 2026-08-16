@@ -24,13 +24,14 @@ three strict categories:
     the main flow.
 -   **Examples**: `PostToolCallHook`.
 
-### 2. Decide Hooks (Read-Only, Blocking)
+### 2. Decide Hooks (Read-Only / Gating, Blocking)
 
 -   **Purpose**: Policy enforcement, permission checks, and guardrails.
--   **Behavior**: They receive data and return a `HookResult` indicating whether
-    execution should proceed (`allow=True`) or be aborted (`allow=False`). They
-    cannot modify the data.
--   **Examples**: `PreToolCallDecideHook`.
+-   **Behavior**: They receive data and return a `HookResult` deciding whether
+    execution should proceed (`allow=True`) or be aborted (`allow=False`).
+    For tool calls, an allow decision may optionally specify `modified_args` to
+    sanitize arguments before execution.
+-   **Examples**: `PreToolCallDecideHook`, `PreTurnHook`.
 
 ### 3. Transform Hooks (Modifying, Blocking)
 

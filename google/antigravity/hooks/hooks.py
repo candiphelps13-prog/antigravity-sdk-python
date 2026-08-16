@@ -173,6 +173,11 @@ class PreToolCallDecideHook(DecideHook[types.ToolCall]):
   """Invoked before a tool call to decide if it should proceed.
 
   The `data` parameter receives the `types.ToolCall` object.
+  Hooks can return:
+  - `HookResult(allow=True)` to allow execution with original arguments.
+  - `HookResult(allow=True, modified_args={...})` to allow execution with
+    modified arguments.
+  - `HookResult(allow=False, message="...")` to deny execution.
   """
 
   pass

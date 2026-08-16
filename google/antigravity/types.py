@@ -923,12 +923,16 @@ class HookResult(pydantic.BaseModel):
   Attributes:
     allow: Whether execution should proceed.
     message: Optional explanation or response message.
+    modified_args: Optional dictionary of modified tool arguments to
+      shallow-merge into the existing arguments dictionary (overwriting
+      specified keys) before execution.
   """
 
   model_config = pydantic.ConfigDict(extra="ignore")
 
   allow: bool = True
   message: str = ""
+  modified_args: dict[str, Any] | None = None
 
 
 class QuestionResponse(pydantic.BaseModel):

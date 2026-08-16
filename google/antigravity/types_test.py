@@ -267,6 +267,15 @@ class HookResultTest(unittest.TestCase):
     hr.allow = False
     self.assertFalse(hr.allow)
 
+  def test_modified_args(self):
+    """Verifies construction and default of modified_args on HookResult."""
+    hr_default = types.HookResult()
+    self.assertIsNone(hr_default.modified_args)
+
+    hr = types.HookResult(allow=True, modified_args={"cmd": "echo safe"})
+    self.assertTrue(hr.allow)
+    self.assertEqual(hr.modified_args, {"cmd": "echo safe"})
+
 
 class QuestionResponseTest(unittest.TestCase):
   """Validates the QuestionResponse Pydantic model."""

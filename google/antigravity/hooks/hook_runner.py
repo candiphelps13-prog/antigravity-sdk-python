@@ -213,13 +213,30 @@ class HookRunner:
       A tuple of (HookResult, ToolCall, OperationContext).
     """
     op_context = hooks_base.OperationContext(turn_context)
+    current_tool_call = tool_call
+    last_allow_result = hooks_base.HookResult(allow=True)
+    had_modifications = False
 
     for hook in self._pre_tool_call_decide_hooks:
-      res = await hook.run(context=op_context, data=tool_call)
+      res = await hook.run(context=op_context, data=current_tool_call)
       if not res.allow:
-        return res, tool_call, op_context
+        return res, current_tool_call, op_context
 
-    return hooks_base.HookResult(allow=True), tool_call, op_context
+      last_allow_result = res
+      if res.modified_args is not None:
+        merged_args = dict(current_tool_call.args)
+        merged_args.update(res.modified_args)
+        current_tool_call = current_tool_call.model_copy(
+            update={'args': merged_args}
+        )
+        had_modifications = True
+
+    if had_modifications:
+      last_allow_result = last_allow_result.model_copy(
+          update={'modified_args': dict(current_tool_call.args)}
+      )
+
+    return last_allow_result, current_tool_call, op_context
 
   async def dispatch_post_tool_call(
       self, op_context: hooks_base.OperationContext, result: Any

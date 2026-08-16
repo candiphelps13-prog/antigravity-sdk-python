@@ -163,6 +163,141 @@ class HookRunnerTest(unittest.IsolatedAsyncioTestCase):
     self.assertTrue(res.allow)
     self.assertEqual(call_order, ["decide"])
 
+  async def test_dispatch_pre_tool_call_modified_args(self):
+    class ModifyHook(hooks.PreToolCallDecideHook):
+
+      async def run(
+          self, context: hooks.HookContext, data: types.ToolCall
+      ) -> hooks.HookResult:
+        del context, data
+        return hooks.HookResult(allow=True, modified_args={"cmd": "echo safe"})
+
+    runner = hook_runner.HookRunner(
+        pre_tool_call_decide_hooks=[ModifyHook()],
+    )
+
+    turn_context = hooks.TurnContext(runner.session_context)
+    tool_call = types.ToolCall(name="run_command", args={"cmd": "rm -rf /"})
+
+    res, updated_tc, _ = await runner.dispatch_pre_tool_call(
+        turn_context, tool_call
+    )
+
+    self.assertTrue(res.allow)
+    self.assertEqual(res.modified_args, {"cmd": "echo safe"})
+    self.assertEqual(updated_tc.args, {"cmd": "echo safe"})
+
+  async def test_dispatch_pre_tool_call_chaining(self):
+    observed_in_hook2 = {}
+
+    class Hook1(hooks.PreToolCallDecideHook):
+
+      async def run(
+          self, context: hooks.HookContext, data: types.ToolCall
+      ) -> hooks.HookResult:
+        del context, data
+        return hooks.HookResult(allow=True, modified_args={"a": 10})
+
+    class Hook2(hooks.PreToolCallDecideHook):
+
+      async def run(
+          self, context: hooks.HookContext, data: types.ToolCall
+      ) -> hooks.HookResult:
+        del context
+        observed_in_hook2.update(data.args)
+        return hooks.HookResult(allow=True, modified_args={"b": 20})
+
+    runner = hook_runner.HookRunner(
+        pre_tool_call_decide_hooks=[Hook1(), Hook2()],
+    )
+
+    turn_context = hooks.TurnContext(runner.session_context)
+    tool_call = types.ToolCall(name="test_tool", args={"a": 1, "b": 2, "c": 3})
+
+    res, updated_tc, _ = await runner.dispatch_pre_tool_call(
+        turn_context, tool_call
+    )
+
+    self.assertTrue(res.allow)
+    # Hook2 should have seen Hook1's modified "a"
+    self.assertEqual(observed_in_hook2, {"a": 10, "b": 2, "c": 3})
+    # Final tool_call and result should have both modifications
+    self.assertEqual(res.modified_args, {"a": 10, "b": 20, "c": 3})
+    self.assertEqual(updated_tc.args, {"a": 10, "b": 20, "c": 3})
+
+  async def test_dispatch_pre_tool_call_modifying_then_allow(self):
+    observed_in_hook2 = {}
+
+    class ModifyingHook(hooks.PreToolCallDecideHook):
+
+      async def run(
+          self, context: hooks.HookContext, data: types.ToolCall
+      ) -> hooks.HookResult:
+        del context, data
+        return hooks.HookResult(allow=True, modified_args={"a": 10})
+
+    class PassiveAllowHook(hooks.PreToolCallDecideHook):
+
+      async def run(
+          self, context: hooks.HookContext, data: types.ToolCall
+      ) -> hooks.HookResult:
+        del context
+        observed_in_hook2.update(data.args)
+        return hooks.HookResult(allow=True, message="Audited by policy")
+
+    runner = hook_runner.HookRunner(
+        pre_tool_call_decide_hooks=[ModifyingHook(), PassiveAllowHook()],
+    )
+
+    turn_context = hooks.TurnContext(runner.session_context)
+    tool_call = types.ToolCall(name="test_tool", args={"a": 1, "b": 2, "c": 3})
+
+    res, updated_tc, _ = await runner.dispatch_pre_tool_call(
+        turn_context, tool_call
+    )
+
+    self.assertTrue(res.allow)
+    self.assertEqual(observed_in_hook2, {"a": 10, "b": 2, "c": 3})
+    self.assertEqual(res.message, "Audited by policy")
+    self.assertEqual(res.modified_args, {"a": 10, "b": 2, "c": 3})
+    self.assertEqual(updated_tc.args, {"a": 10, "b": 2, "c": 3})
+
+  async def test_dispatch_pre_tool_call_modifying_then_deny(self):
+    observed_in_hook2 = {}
+
+    class ModifyingHook(hooks.PreToolCallDecideHook):
+
+      async def run(
+          self, context: hooks.HookContext, data: types.ToolCall
+      ) -> hooks.HookResult:
+        del context, data
+        return hooks.HookResult(allow=True, modified_args={"cmd": "echo safe"})
+
+    class DenyingHook(hooks.PreToolCallDecideHook):
+
+      async def run(
+          self, context: hooks.HookContext, data: types.ToolCall
+      ) -> hooks.HookResult:
+        del context
+        observed_in_hook2.update(data.args)
+        return hooks.HookResult(allow=False, message="Forbidden tool")
+
+    runner = hook_runner.HookRunner(
+        pre_tool_call_decide_hooks=[ModifyingHook(), DenyingHook()],
+    )
+
+    turn_context = hooks.TurnContext(runner.session_context)
+    tool_call = types.ToolCall(name="run_command", args={"cmd": "rm -rf /"})
+
+    res, updated_tc, _ = await runner.dispatch_pre_tool_call(
+        turn_context, tool_call
+    )
+
+    self.assertFalse(res.allow)
+    self.assertEqual(observed_in_hook2, {"cmd": "echo safe"})
+    self.assertEqual(res.message, "Forbidden tool")
+    self.assertEqual(updated_tc.args, {"cmd": "echo safe"})
+
   async def test_context_scoping(self):
     runner = hook_runner.HookRunner()
     runner.session_context.set_state("session_key", "session_value")

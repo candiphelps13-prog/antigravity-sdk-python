@@ -219,6 +219,8 @@ class HookRouter:
     ptr = localharness_pb2.PreToolResult()
     if result.allow:
       ptr.decision = localharness_pb2.PreToolResult.Decision.ALLOW
+      if result.modified_args is not None:
+        ptr.modified_arguments_json = json.dumps(result.modified_args)
     else:
       ptr.decision = localharness_pb2.PreToolResult.Decision.DENY
       ptr.reason = result.message or ""
