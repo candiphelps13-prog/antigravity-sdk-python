@@ -41,7 +41,7 @@ dependencies = [
     "pydantic>=2.0",
     "uvicorn>=0.46",
     "websockets>=12.0",
-    "protobuf>=4.25",
+    "protobuf>=7.35",
 ]
 
 [project.optional-dependencies]
