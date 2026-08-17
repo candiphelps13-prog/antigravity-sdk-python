@@ -733,7 +733,14 @@ message ToolOutputTruncation {
   }
 }
 message PolicyConfig {
+  enum WorkspaceContainment {
+    WORKSPACE_CONTAINMENT_UNSPECIFIED = 0;
+    WORKSPACE_CONTAINMENT_ENABLED = 1;
+    WORKSPACE_CONTAINMENT_DISABLED = 2;
+  }
   repeated .antigravity.localharness.PolicyRule rules = 1;
+  .antigravity.localharness.PolicyConfig.WorkspaceContainment
+      workspace_containment = 2;
 }
 message PolicyRule {
   string tool = 1;
