@@ -84,6 +84,11 @@ def normalize_wire_path(path: str) -> str:
   return path
 
 
+def make_step_id(trajectory_id: str, step_index: int) -> str:
+  """Creates a unique step identifier from trajectory ID and step index."""
+  return f"{trajectory_id}:{step_index}" if trajectory_id else str(step_index)
+
+
 class BaseLocalAgentConfig(connection.AgentConfig):
   """Base configuration class for local harness agent configurations."""
 

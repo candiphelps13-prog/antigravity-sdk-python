@@ -627,6 +627,8 @@ class ToolCall(pydantic.BaseModel):
 
   Attributes:
     id: Optional unique identifier for the call, often assigned by the backend.
+    step_id: Optional identifier correlating this call with its step in the
+      trajectory.
     name: Tool identifier. Use a BuiltinTools member for Connection-provided
       tools, or an arbitrary string for custom host-side tools.
     args: Keyword arguments for the tool, as a JSON-serializable dict.
@@ -638,6 +640,7 @@ class ToolCall(pydantic.BaseModel):
   name: BuiltinTools | str
   args: dict[str, Any] = pydantic.Field(default_factory=dict)
   id: str | None = None
+  step_id: str | None = None
   canonical_path: str | None = None
   server_name: str | None = None
 
@@ -647,6 +650,7 @@ class ToolResult(pydantic.BaseModel):
 
   Attributes:
     id: Optional identifier correlating this result with a ToolCall.id.
+    step_id: Optional step identifier correlating this result with a step.
     name: The name of the tool that was executed. A BuiltinTools member for
       Connection-provided tools, or a string for custom host-side tools.
     result: The tool's return value. Can be any JSON-serializable value.
@@ -661,6 +665,7 @@ class ToolResult(pydantic.BaseModel):
 
   name: BuiltinTools | str
   id: str | None = None
+  step_id: str | None = None
   result: Any = None
   error: str | None = None
   exception: Exception | None = pydantic.Field(default=None, exclude=True)
@@ -1027,6 +1032,7 @@ class ToolExecutionError(RuntimeError):
   tool_name: str
   server_name: str | None
   call_id: str | None
+  step_id: str | None
 
   def __init__(
       self,
@@ -1034,11 +1040,13 @@ class ToolExecutionError(RuntimeError):
       tool_name: str,
       server_name: str | None = None,
       call_id: str | None = None,
+      step_id: str | None = None,
   ):
     super().__init__(message)
     self.tool_name = tool_name
     self.server_name = server_name
     self.call_id = call_id
+    self.step_id = step_id
 
 
 class AntigravityValidationError(Exception):

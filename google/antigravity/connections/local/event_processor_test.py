@@ -229,6 +229,7 @@ class LocalConnectionStepFromDictTest(absltest.TestCase):
     self.assertLen(step.tool_calls, 1)
     self.assertEqual(step.tool_calls[0].name, "view_file")
     self.assertEqual(step.tool_calls[0].args, {"file_path": "/foo"})
+    self.assertEqual(step.tool_calls[0].step_id, "0")
     self.assertEqual(step.tool_calls[0].canonical_path, "/foo")
 
   def test_step_type_tool_call_with_generate_image_normalizes_output_path(self):

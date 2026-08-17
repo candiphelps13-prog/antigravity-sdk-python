@@ -20,6 +20,7 @@ from typing import Any, Callable, Coroutine
 
 from google.antigravity.proto import localharness_pb2
 from google.antigravity import types
+from google.antigravity.connections.local.local_connection_config import make_step_id
 from google.antigravity.connections.local.local_connection_config import normalize_wire_path
 from google.antigravity.connections.local.local_connection_config import PROTO_FIELD_TO_SDK_NAME
 from google.antigravity.connections.local.local_connection_config import WIRE_PATH_ARGUMENT_KEYS
@@ -180,6 +181,7 @@ class HookRouter:
     args: dict[str, Any] = {}
     server_name: str | None = None
     call_id: str | None = None
+    step_id: str | None = None
     if req.HasField("pre_tool_args"):
       pta = req.pre_tool_args
       tool_name = PROTO_FIELD_TO_SDK_NAME.get(pta.tool_name, pta.tool_name)
@@ -191,6 +193,8 @@ class HookRouter:
         server_name = pta.server_name
       if pta.call_id:
         call_id = pta.call_id
+      if pta.trajectory_id or pta.HasField("step_index"):
+        step_id = make_step_id(pta.trajectory_id, pta.step_index)
       _normalize_path_args(args)
 
     # Derive canonical_path from the first normalized path field so that
@@ -206,6 +210,7 @@ class HookRouter:
         name=tool_name,
         args=args,
         id=call_id,
+        step_id=step_id,
         server_name=server_name,
         canonical_path=canonical_path,
     )
@@ -234,6 +239,7 @@ class HookRouter:
     tool_name = ""
     server_name: str | None = None
     call_id: str | None = None
+    step_id: str | None = None
     result_val: Any = None
     error_str = ""
     if req.HasField("post_tool_args"):
@@ -241,6 +247,8 @@ class HookRouter:
       tool_name = PROTO_FIELD_TO_SDK_NAME.get(pta.tool_name, pta.tool_name)
       server_name = pta.server_name or None
       call_id = pta.call_id or None
+      if pta.trajectory_id or pta.HasField("step_index"):
+        step_id = make_step_id(pta.trajectory_id, pta.step_index)
       result_val = pta.result if not pta.error else None
       error_str = pta.error
       if self._extract_result and not pta.error and pta.result:
@@ -250,6 +258,7 @@ class HookRouter:
     tool_result = types.ToolResult(
         name=tool_name,
         id=call_id,
+        step_id=step_id,
         server_name=server_name,
         result=result_val,
         error=error_str or None,
@@ -271,15 +280,18 @@ class HookRouter:
     tool_name = ""
     server_name = None
     call_id = None
+    step_id: str | None = None
     if req.HasField("on_tool_error_args"):
       ote = req.on_tool_error_args
       error_message = ote.error_message or error_message
       tool_name = PROTO_FIELD_TO_SDK_NAME.get(ote.tool_name, ote.tool_name)
       server_name = ote.server_name or None
       call_id = ote.call_id or None
+      if ote.trajectory_id or ote.HasField("step_index"):
+        step_id = make_step_id(ote.trajectory_id, ote.step_index)
 
     error = types.ToolExecutionError(
-        error_message, tool_name, server_name, call_id=call_id
+        error_message, tool_name, server_name, call_id=call_id, step_id=step_id
     )
     turn_ctx = self._current_turn_context or hooks.TurnContext(
         self._hook_runner.session_context

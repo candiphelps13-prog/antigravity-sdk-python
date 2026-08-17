@@ -27,6 +27,7 @@ from google.antigravity import types
 from google.antigravity.connections.local import types as local_types
 from google.antigravity.connections.local.hook_router import HookRouter
 from google.antigravity.connections.local.local_connection_config import BUILTIN_TOOL_PROTO_FIELDS
+from google.antigravity.connections.local.local_connection_config import make_step_id
 from google.antigravity.connections.local.local_connection_config import normalize_wire_path
 from google.antigravity.connections.local.local_connection_config import WIRE_PATH_ARGUMENT_KEYS
 from google.antigravity.hooks import hook_runner as h_runner
@@ -163,9 +164,7 @@ def _extract_tool_result(
     return None
 
 
-def _make_step_id(trajectory_id: str, step_index: int) -> str:
-  """Creates a unique step identifier."""
-  return f"{trajectory_id}:{step_index}" if trajectory_id else str(step_index)
+_make_step_id = make_step_id
 
 
 def parse_usage_metadata(
@@ -302,6 +301,7 @@ class LocalConnectionStep(types.Step):
               name=active_tool_name,
               args=active_tool_args,
               id=active_tool_id or _make_step_id(traj_id, step_idx),
+              step_id=_make_step_id(traj_id, step_idx),
               canonical_path=canonical_path,
               server_name=active_server_name,
           )

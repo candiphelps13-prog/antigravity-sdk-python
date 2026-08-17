@@ -98,20 +98,20 @@ async def log_post_turn(data: str):
 @hooks.pre_tool_call_decide
 async def log_pre_tool_call_decide(data: types.ToolCall) -> types.HookResult:
   """Logs tool calls before execution. Always approves."""
-  print(f"[Hook] Pre-tool-call (decide) — tool: {data}")
+  print(f"[Hook] Pre-tool-call (decide) — step_id: {data.step_id} tool: {data}")
   return types.HookResult(allow=True)
 
 
 @hooks.post_tool_call
-async def log_post_tool_call(data: Any):
+async def log_post_tool_call(data: types.ToolResult):
   """Logs tool results after execution."""
-  print(f"[Hook] Post-tool-call — result: {data}")
+  print(f"[Hook] Post-tool-call — step_id: {data.step_id} result: {data}")
 
 
 @hooks.on_tool_error
-async def log_tool_error(data: Exception):
+async def log_tool_error(data: types.ToolExecutionError):
   """Logs tool errors. Does not provide a recovery value."""
-  print(f"[Hook] Tool error — {data}")
+  print(f"[Hook] Tool error — step_id: {data.step_id} error: {data}")
   return None  # No recovery; let the error propagate.
 
 
@@ -119,15 +119,18 @@ async def log_tool_error(data: Exception):
 async def log_pre_subagent_call(data: types.ToolCall) -> types.HookResult:
   """Logs subagent invocations by filtering on START_SUBAGENT. Always allows."""
   if data.name == types.BuiltinTools.START_SUBAGENT.value:
-    print(f"[Hook] Pre-subagent-call — tool_call: {data}")
+    print(
+        f"[Hook] Pre-subagent-call — step_id: {data.step_id} tool_call:"
+        f" {data}"
+    )
   return types.HookResult(allow=True)
 
 
 @hooks.post_tool_call
-async def log_post_subagent_call(data: Any):
+async def log_post_subagent_call(data: types.ToolResult):
   """Logs when a subagent trajectory completes by filtering on START_SUBAGENT."""
   if data.name == types.BuiltinTools.START_SUBAGENT.value:
-    print(f"[Hook] Post-subagent-call — result: {data}")
+    print(f"[Hook] Post-subagent-call — step_id: {data.step_id} result: {data}")
 
 
 @hooks.on_compaction

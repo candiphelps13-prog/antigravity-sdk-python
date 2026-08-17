@@ -82,6 +82,16 @@ class ToolCallTest(unittest.TestCase):
     tc = types.ToolCall(id="call_123", name="tool")
     self.assertEqual(tc.id, "call_123")
 
+  def test_step_id_defaults_to_none(self):
+    """Verifies that step_id defaults to None when omitted."""
+    tc = types.ToolCall(name="tool")
+    self.assertIsNone(tc.step_id)
+
+  def test_step_id_explicitly_set(self):
+    """Verifies that step_id can be explicitly set."""
+    tc = types.ToolCall(step_id="traj-1:5", name="tool")
+    self.assertEqual(tc.step_id, "traj-1:5")
+
   def test_extra_fields_ignored(self):
     """Verifies that unknown fields are silently dropped.
 
@@ -155,6 +165,16 @@ class ToolResultTest(unittest.TestCase):
     tr = types.ToolResult(name="tool")
     tr.id = "call_456"
     self.assertEqual(tr.id, "call_456")
+
+  def test_step_id_defaults_to_none(self):
+    """Verifies that step_id defaults to None when omitted."""
+    tr = types.ToolResult(name="tool")
+    self.assertIsNone(tr.step_id)
+
+  def test_step_id_explicitly_set(self):
+    """Verifies that step_id can be explicitly set."""
+    tr = types.ToolResult(step_id="traj-1:3", name="tool", result="ok")
+    self.assertEqual(tr.step_id, "traj-1:3")
 
   def test_extra_fields_ignored(self):
     """Verifies extra='ignore' on ToolResult.
@@ -895,6 +915,7 @@ class ToolExecutionErrorTest(unittest.TestCase):
     self.assertEqual(err.tool_name, "run_command")
     self.assertIsNone(err.server_name)
     self.assertIsNone(err.call_id)
+    self.assertIsNone(err.step_id)
 
   def test_explicit_server_name_and_call_id(self):
     """Verifies construction with explicit server_name and call_id."""
@@ -903,12 +924,14 @@ class ToolExecutionErrorTest(unittest.TestCase):
         tool_name="mcp_tool",
         server_name="mcp_server",
         call_id="call_123",
+        step_id="step_456",
     )
     self.assertIsInstance(err, RuntimeError)
     self.assertEqual(str(err), "query failed")
     self.assertEqual(err.tool_name, "mcp_tool")
     self.assertEqual(err.server_name, "mcp_server")
     self.assertEqual(err.call_id, "call_123")
+    self.assertEqual(err.step_id, "step_456")
 
 
 class ImageTest(unittest.TestCase):

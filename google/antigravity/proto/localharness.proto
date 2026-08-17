@@ -644,6 +644,8 @@ message PreToolArgs {
   string arguments_json = 2;
   string server_name = 3;
   string call_id = 4;
+  string trajectory_id = 5;
+  uint32 step_index = 6;
 }
 message PostToolArgs {
   string tool_name = 1;
@@ -651,12 +653,16 @@ message PostToolArgs {
   string error = 3;
   string server_name = 5;
   string call_id = 6;
+  string trajectory_id = 7;
+  uint32 step_index = 8;
 }
 message OnToolErrorArgs {
   string tool_name = 1;
   string error_message = 2;
   string server_name = 4;
   string call_id = 5;
+  string trajectory_id = 6;
+  uint32 step_index = 7;
 }
 message PreTurnArgs {
   .antigravity.localharness.UserInput user_input = 1;
