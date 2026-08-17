@@ -309,6 +309,63 @@ class BaseHookTest(unittest.IsolatedAsyncioTestCase):
     self.assertTrue(res.allow)
     self.assertIs(context_passed, ctx)
 
+  async def test_decorator_sync_pre_turn(self):
+    """Verifies synchronous @pre_turn hook runs correctly."""
+    called_with = None
+
+    @hooks.pre_turn
+    def my_sync_hook(data):
+      nonlocal called_with
+      called_with = data
+      return hooks.HookResult(allow=True, message="sync_allowed")
+
+    ctx = hooks.HookContext()
+    res = await my_sync_hook.run(ctx, "prompt_data")
+    self.assertTrue(res.allow)
+    self.assertEqual(res.message, "sync_allowed")
+    self.assertEqual(called_with, "prompt_data")
+
+  async def test_decorator_sync_on_session_start(self):
+    """Verifies synchronous @on_session_start hook runs correctly."""
+    called = False
+
+    @hooks.on_session_start
+    def my_sync_hook():
+      nonlocal called
+      called = True
+
+    ctx = hooks.HookContext()
+    await my_sync_hook.run(ctx, None)
+    self.assertTrue(called)
+
+  async def test_decorator_sync_pre_turn_with_context(self):
+    """Verifies synchronous @pre_turn hook with context parameter works."""
+    called_with = None
+    context_passed = None
+
+    @hooks.pre_turn
+    def my_sync_hook(ctx: hooks.HookContext, data):
+      nonlocal called_with, context_passed
+      called_with = data
+      context_passed = ctx
+      return hooks.HookResult(allow=True)
+
+    ctx = hooks.HookContext()
+    res = await my_sync_hook.run(ctx, "prompt_data")
+    self.assertTrue(res.allow)
+    self.assertEqual(called_with, "prompt_data")
+    self.assertIs(context_passed, ctx)
+
+  async def test_decorator_sync_direct_call(self):
+    """Verifies calling a synchronous decorated hook directly works."""
+
+    @hooks.pre_turn
+    def my_sync_hook(data):
+      return f"echo: {data}"
+
+    res = await my_sync_hook("test")
+    self.assertEqual(res, "echo: test")
+
 
 if __name__ == "__main__":
   unittest.main()

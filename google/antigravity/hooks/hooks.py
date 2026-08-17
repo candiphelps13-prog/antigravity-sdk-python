@@ -259,10 +259,11 @@ def _is_context_parameter(param: inspect.Parameter) -> bool:
 
 
 def _make_hook_decorator(hook_cls: type[Any], *, pass_data: bool = True):
-  """Creates a decorator that wraps an async function as a Hook subclass.
+  """Creates a decorator that wraps a function as a Hook subclass.
 
   Each decorator-created hook delegates its ``run()`` to the wrapped
-  function and remains directly callable for convenience.
+  function and remains directly callable for convenience. Both synchronous
+  and asynchronous functions are supported.
 
   If the wrapped function accepts `context` (either by name 'context' or
   by type hint matching HookContext), the HookContext will be passed to it.
@@ -274,7 +275,7 @@ def _make_hook_decorator(hook_cls: type[Any], *, pass_data: bool = True):
       arguments by default.
 
   Returns:
-    A decorator that converts an async function into a Hook instance.
+    A decorator that converts a function into a Hook instance.
   """
 
   class _FunctionHookWithData(hook_cls):
@@ -286,10 +287,16 @@ def _make_hook_decorator(hook_cls: type[Any], *, pass_data: bool = True):
       functools.update_wrapper(self, f)
 
     async def run(self, context: HookContext, data: Any) -> Any:
-      return await self._call_fn(context, data)
+      res = self._call_fn(context, data)
+      if inspect.isawaitable(res):
+        return await res
+      return res
 
     async def __call__(self, *args, **kwargs):
-      return await self.f(*args, **kwargs)
+      res = self.f(*args, **kwargs)
+      if inspect.isawaitable(res):
+        return await res
+      return res
 
   class _FunctionHookNoData(hook_cls):
     """Internal hook implementation wrapping a decorated function."""
@@ -300,10 +307,16 @@ def _make_hook_decorator(hook_cls: type[Any], *, pass_data: bool = True):
       functools.update_wrapper(self, f)
 
     async def run(self, context: HookContext, data: Any) -> Any:
-      return await self._call_fn(context)
+      res = self._call_fn(context)
+      if inspect.isawaitable(res):
+        return await res
+      return res
 
     async def __call__(self, *args, **kwargs):
-      return await self.f(*args, **kwargs)
+      res = self.f(*args, **kwargs)
+      if inspect.isawaitable(res):
+        return await res
+      return res
 
   def decorator(func):
     sig = inspect.signature(func)
@@ -388,13 +401,9 @@ on_tool_error = _make_hook_decorator(OnToolErrorHook)
 class _PreStepHook(InspectHook[types.Step]):
   """Invoked when a step is first seen in the stream (internal)."""
 
-  pass
-
 
 class _PostStepHook(InspectHook[types.Step]):
   """Invoked when a step completes (internal)."""
-
-  pass
 
 
 _pre_step = _make_hook_decorator(_PreStepHook)
