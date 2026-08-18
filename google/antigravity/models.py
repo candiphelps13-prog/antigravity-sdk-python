@@ -135,7 +135,11 @@ class VertexEndpoint(ModelEndpoint):
   @pydantic.model_validator(mode="before")
   @classmethod
   def _populate_env_vars(cls, data: Any) -> Any:
-    if isinstance(data, dict):
+    # Skip populating ambient project/location from the environment when a
+    # custom base_url is specified. This matches the Google Gen AI SDK behavior
+    # to avoid contaminating external proxies/gateways with ambient shell
+    # project metadata (which alters URL paths to /projects/.../locations/...).
+    if isinstance(data, dict) and not data.get("base_url"):
       if not data.get("api_key"):
         if data.get("project") is None:
           data["project"] = os.environ.get("GOOGLE_CLOUD_PROJECT")

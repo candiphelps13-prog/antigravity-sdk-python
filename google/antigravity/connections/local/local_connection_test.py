@@ -2446,8 +2446,40 @@ class LocalConnectionStrategyApiKeyTest(unittest.IsolatedAsyncioTestCase):
     self.assertIsNone(ep.location)
     ep.validate_endpoint()
 
+  @mock.patch.dict(
+      "os.environ",
+      {
+          "GOOGLE_CLOUD_PROJECT": "env-project",
+          "GOOGLE_CLOUD_LOCATION": "env-location",
+      },
+      clear=True,
+  )
+  def test_vertex_endpoint_base_url_skips_env_hydration(self):
+    """VertexEndpoint(base_url=...) skips hydrating project and location from env."""
+    ep = types.VertexEndpoint(base_url="http://localhost:8080")
+    self.assertEqual(ep.base_url, "http://localhost:8080")
+    self.assertIsNone(ep.project)
+    self.assertIsNone(ep.location)
+    self.assertIsNone(ep.api_key)
+    ep.validate_endpoint()
+
+  def test_vertex_endpoint_base_url_allows_custom_auth_and_routing(self):
+    """VertexEndpoint allows custom project/location and api_key when base_url is set."""
+    ep = types.VertexEndpoint(
+        base_url="https://gateway.example.com/vertex",
+        project="my-proj",
+        location="us-central1",
+        api_key="gateway-key",
+        http_headers={"Authorization": "Bearer token"},
+    )
+    self.assertEqual(ep.base_url, "https://gateway.example.com/vertex")
+    self.assertEqual(ep.project, "my-proj")
+    self.assertEqual(ep.location, "us-central1")
+    self.assertEqual(ep.api_key, "gateway-key")
+    ep.validate_endpoint()
+
   def test_vertex_endpoint_mutual_exclusivity(self):
-    """VertexEndpoint raises ValueError when both api_key and project/location are set."""
+    """VertexEndpoint raises ValueError when both api_key and project/location are set without base_url."""
     ep_both = types.VertexEndpoint(
         project="my-proj", location="us-central1", api_key="express-key"
     )
