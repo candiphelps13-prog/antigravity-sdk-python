@@ -786,13 +786,38 @@ class CapabilitiesConfigTest(unittest.TestCase):
       types.CapabilitiesConfig(max_subagent_depth=0)
     self.assertIn("greater than or equal to 1", str(cm.exception))
 
-  def test_enable_daemon_commands_default_and_custom(self):
-    """Verifies enable_daemon_commands defaults to False and can be set to True."""
+  def test_run_command_config_defaults_and_custom(self):
+    """Verifies RunCommandConfig defaults and custom settings on CapabilitiesConfig."""
     config_default = types.CapabilitiesConfig()
-    self.assertFalse(config_default.enable_daemon_commands)
+    self.assertIsNone(config_default.run_command_config)
 
-    config_custom = types.CapabilitiesConfig(enable_daemon_commands=True)
-    self.assertTrue(config_custom.enable_daemon_commands)
+    run_cmd_default = types.RunCommandConfig()
+    self.assertFalse(run_cmd_default.enable_daemons)
+    self.assertIsNone(run_cmd_default.timeout_seconds)
+
+    config_custom = types.CapabilitiesConfig(
+        run_command_config=types.RunCommandConfig(
+            enable_daemons=True,
+            timeout_seconds=600.0,
+        )
+    )
+    self.assertIsNotNone(config_custom.run_command_config)
+    self.assertTrue(config_custom.run_command_config.enable_daemons)
+    self.assertEqual(config_custom.run_command_config.timeout_seconds, 600.0)
+
+    subagent_caps = types.SubagentCapabilities(
+        run_command_config=types.RunCommandConfig(timeout_seconds=30.0)
+    )
+    self.assertIsNotNone(subagent_caps.run_command_config)
+    self.assertEqual(subagent_caps.run_command_config.timeout_seconds, 30.0)
+
+  def test_run_command_config_non_positive_timeout_raises(self):
+    """Verifies timeout_seconds <= 0 raises ValidationError."""
+    with self.assertRaises(pydantic.ValidationError):
+      types.RunCommandConfig(timeout_seconds=0)
+
+    with self.assertRaises(pydantic.ValidationError):
+      types.RunCommandConfig(timeout_seconds=-10.0)
 
   def test_subagent_capabilities_allowed_subagents(self):
     """Verifies allowed_subagents on SubagentCapabilities."""

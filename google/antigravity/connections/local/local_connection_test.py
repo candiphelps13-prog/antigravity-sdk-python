@@ -1561,7 +1561,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
         subagents=localharness_pb2.SubagentsConfig(enabled=False),
         user_questions=localharness_pb2.UserQuestionsConfig(enabled=False),
         run_command=localharness_pb2.RunCommandToolConfig(
-            enabled=False, enable_daemon_commands=False
+            enabled=False, enable_daemon_commands=False, max_timeout_ms=0
         ),
         find=localharness_pb2.FindToolConfig(enabled=False),
         generate_image=localharness_pb2.GenerateImageToolConfig(enabled=False),
@@ -1577,34 +1577,52 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
 
     self.assertEqual(config.harness_side_tools, expected_harness_side_tools)
 
-  def test_capabilities_config_enable_daemon_commands_custom(self):
-    """Verifies enable_daemon_commands maps to RunCommandToolConfig."""
-    strategy_false = self._make_strategy(
+  def test_capabilities_config_run_command_custom(self):
+    """Verifies RunCommandConfig maps to RunCommandToolConfig."""
+    strategy_custom = self._make_strategy(
         capabilities_config=types.CapabilitiesConfig(
-            enable_daemon_commands=False,
+            run_command_config=types.RunCommandConfig(
+                enable_daemons=False,
+                timeout_seconds=60.0,
+            ),
         )
     )
-    config_false = strategy_false._build_harness_config()
+    config_custom = strategy_custom._build_harness_config()
     self.assertFalse(
-        config_false.harness_side_tools.run_command.enable_daemon_commands
+        config_custom.harness_side_tools.run_command.enable_daemon_commands
+    )
+    self.assertEqual(
+        config_custom.harness_side_tools.run_command.max_timeout_ms,
+        60_000,
     )
 
     strategy_true = self._make_strategy(
         capabilities_config=types.CapabilitiesConfig(
-            enable_daemon_commands=True,
+            run_command_config=types.RunCommandConfig(
+                enable_daemons=True,
+                timeout_seconds=None,
+            ),
         )
     )
     config_true = strategy_true._build_harness_config()
     self.assertTrue(
         config_true.harness_side_tools.run_command.enable_daemon_commands
     )
+    self.assertEqual(
+        config_true.harness_side_tools.run_command.max_timeout_ms,
+        0,
+    )
 
-  def test_build_harness_config_defaults_enable_daemon_commands(self):
-    """Verifies enable_daemon_commands defaults to False when capabilities_config is None."""
+  def test_build_harness_config_defaults_run_command(self):
+    """Verifies run_command defaults when capabilities_config is None or has no RunCommandConfig."""
     strategy = self._make_strategy(capabilities_config=None)
     config = strategy._build_harness_config()
     self.assertFalse(
         config.harness_side_tools.run_command.enable_daemon_commands
+    )
+    self.assertEqual(
+        config.harness_side_tools.run_command.max_timeout_ms,
+        0,
     )
 
   def test_capabilities_config_max_subagent_depth_and_allowed_subagents(self):

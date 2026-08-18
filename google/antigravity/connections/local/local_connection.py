@@ -910,10 +910,18 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
     if max_depth is not None:
       subagents_proto.max_nesting_depth = max_depth
 
+    run_cmd_cfg = None
+    if cfg is not None:
+      run_cmd_cfg = getattr(cfg, "run_command_config", None) or getattr(
+          cfg, "run_command", None
+      )
     enable_daemon = (
-        getattr(cfg, "enable_daemon_commands", False)
-        if cfg is not None
-        else False
+        run_cmd_cfg.enable_daemons if run_cmd_cfg is not None else False
+    )
+    timeout_ms = (
+        int(round(run_cmd_cfg.timeout_seconds * 1000))
+        if run_cmd_cfg is not None and run_cmd_cfg.timeout_seconds is not None
+        else 0
     )
 
     return localharness_pb2.HarnessSideTools(
@@ -927,6 +935,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
         run_command=localharness_pb2.RunCommandToolConfig(
             enabled=types.BuiltinTools.RUN_COMMAND in active_tools,
             enable_daemon_commands=enable_daemon,
+            max_timeout_ms=timeout_ms,
         ),
         file_edit=localharness_pb2.FileEditToolConfig(
             enabled=types.BuiltinTools.EDIT_FILE in active_tools

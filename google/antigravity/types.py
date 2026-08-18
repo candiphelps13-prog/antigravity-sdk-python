@@ -58,6 +58,7 @@ __all__ = [
     "SubagentCapabilities",
     "AgentBehavior",
     "BuiltinTools",
+    "RunCommandConfig",
     "CapabilitiesConfig",
     "ModelAPIRetryConfig",
     "ModelOutputRetryConfig",
@@ -165,6 +166,23 @@ class AgentBehavior(str, enum.Enum):
   INTERACTIVE = "interactive"
 
 
+class RunCommandConfig(pydantic.BaseModel):
+  """Configuration for the builtin run_command tool.
+
+  Attributes:
+    enable_daemons: Whether the agent is authorized to start long-running
+      daemon commands (e.g. background dev servers, watchers) using
+      run_command(IsDaemon=True) without blocking session completion. When True,
+      the IsDaemon argument is exposed on the run_command tool schema. Defaults
+      to False.
+    timeout_seconds: Maximum execution duration in seconds for commands.
+      When None, the default timeout (10 minutes) is used. Defaults to None.
+  """
+
+  enable_daemons: bool = False
+  timeout_seconds: float | None = pydantic.Field(default=None, gt=0)
+
+
 class SubagentCapabilities(pydantic.BaseModel):
   """Capabilities configuration for subagents.
 
@@ -181,12 +199,14 @@ class SubagentCapabilities(pydantic.BaseModel):
       exclusive with disabled_tools. When None, the harness defaults are used.
     disabled_tools: Explicit denylist of builtin tools to disable. Mutually
       exclusive with enabled_tools. When None, the harness defaults are used.
+    run_command_config: Optional configuration for the builtin run_command tool.
   """
 
   agent_behavior: AgentBehavior = AgentBehavior.AUTONOMOUS
   allowed_subagents: list[str] | None = None
   enabled_tools: list[BuiltinTools] | None = None
   disabled_tools: list[BuiltinTools] | None = None
+  run_command_config: RunCommandConfig | None = None
 
   @pydantic.model_validator(mode="after")
   def _check_mutually_exclusive(self) -> "SubagentCapabilities":
@@ -405,11 +425,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
       When None, defaults to 1 (flat single-level delegation).
     allowed_subagents: Explicit allowlist of subagent names the root agent may
       directly invoke. When None, all registered subagents are discoverable.
-    enable_daemon_commands: Whether the agent is authorized to start
-      long-running daemon commands (e.g. background dev servers, watchers)
-      using run_command(IsDaemon=True) without blocking session completion.
-      When True, the IsDaemon argument is exposed on the run_command tool
-      schema. Defaults to False.
+    run_command_config: Optional configuration for the builtin run_command tool.
   """
 
   enable_subagents: bool = True
@@ -420,7 +436,7 @@ class CapabilitiesConfig(pydantic.BaseModel):
   finish_tool_schema_json: str | None = None
   max_subagent_depth: int | None = pydantic.Field(default=None, ge=1)
   allowed_subagents: list[str] | None = None
-  enable_daemon_commands: bool = False
+  run_command_config: RunCommandConfig | None = None
 
   @pydantic.model_validator(mode="after")
   def _check_mutually_exclusive(self) -> "CapabilitiesConfig":
