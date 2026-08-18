@@ -220,6 +220,8 @@ message HarnessSideTools {
   .antigravity.localharness.SearchWebToolConfig search_web = 12;
   .antigravity.localharness.ReadUrlContentToolConfig read_url_content = 14;
   .antigravity.localharness.ToolSearchConfig tool_search_config = 15;
+  .antigravity.localharness.ManageTaskToolConfig manage_task = 16;
+  .antigravity.localharness.ScheduleToolConfig schedule = 17;
   extensions 1000 to 1999;
   extensions 2000 to max;
 }
@@ -270,6 +272,12 @@ message ReadUrlContentToolConfig {
 message ToolSearchConfig {
   bool enabled = 1;
   extensions 1000 to max;
+}
+message ManageTaskToolConfig {
+  bool enabled = 1;
+}
+message ScheduleToolConfig {
+  bool enabled = 1;
 }
 message PermissionsConfig {
   bool enforce_workspace_validation = 1;
