@@ -67,7 +67,7 @@ The 0.1.11 release updates the default model to `gemini-3.7-flash`, introduces s
 ### 🌟 Key Highlights
 
 - **Default Model Upgrade to Gemini 3.7 Flash**: Upgraded the default inference model to `gemini-3.7-flash`.
-- **Session Budget Enforcement & Stop Reasons**: Added `BudgetConfig` to define session-level usage limits (total tokens, turns, and cost) and `StopReason` enum (`BUDGET_EXCEEDED`, `TURN_LIMIT`, `USER_CANCELLED`, etc.) to inspect turn termination causes.
+- **Session Budget Enforcement & Stop Reasons**: Added `BudgetConfig` to define session-level usage limits (model invocations, tool invocations, and token budgets) and `StopReason` enum (`MAX_MODEL_CALLS_EXCEEDED`, `MAX_TOOL_CALLS_EXCEEDED`, `MAX_TOTAL_TOKENS_EXCEEDED`, `QUOTA_EXHAUSTED`, etc.) to inspect turn termination causes.
 - **Vertex AI Express Mode Support**: Added native support for Express Mode authentication via `VertexEndpoint(api_key=...)` and `LocalAgentConfig(vertex=true, api_key=...)`, simplifying headless and non-GCP deployments.
 - **Autonomous Agent Behavior Mode**: Control the agent's behavior with `AgentBehavior`. By default the SDK now has a `AgentBehavior.AUTONOMOUS` mode (used to be `AgentBehavior.INTERACTIVE`) to streamline scripting, background and headless interactions modes.
 - **Multi-Interface Hook Registration**: Enabled single-instance registration across multiple hook interfaces (`PreToolHook`, `PostToolHook`, `PreTurnHook`), allowing for cross functional instrumentation.
@@ -75,10 +75,10 @@ The 0.1.11 release updates the default model to `gemini-3.7-flash`, introduces s
 ### 🔧 Detailed Changes
 
 #### New Features
-- **Budget Enforcement**: Introduced `BudgetConfig(max_total_tokens, max_turns, max_cost_usd)` and exposed stop reason metadata on turn responses.
+- **Budget Enforcement**: Introduced `BudgetConfig(max_model_calls, max_tool_calls, max_input_tokens, max_output_tokens, max_total_tokens)` and exposed stop reason metadata on turn responses.
 - **Express Mode API Key Auth**: Added `api_key` support across `VertexEndpoint` and local agent configurations.
 - **Multi-Interface Hooks**: Supported registering composite hook classes without duplicate invocation.
-- **PreToolArgs Metadata**: Exposed `trajectory_id` and `step_index` on tool hook payloads for chat thread context tracing.
+- **PreToolArgs Metadata**: Exposed `step_id` on tool hook payloads for chat thread context tracing.
 
 #### Model & Default Changes
 - **Default Model Upgrade**: Updated the default model from `gemini-3.6-flash` to `gemini-3.7-flash`.
