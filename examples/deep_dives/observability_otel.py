@@ -21,11 +21,13 @@ tracing.
 import asyncio
 import sys
 
-from google import antigravity
-from google.antigravity.utils import otel as otel_hooks
 from opentelemetry import trace
 from opentelemetry.sdk import trace as sdk_trace
 from opentelemetry.sdk.trace import export as sdk_trace_export
+
+from google.antigravity import Agent
+from google.antigravity import LocalAgentConfig
+from google.antigravity.utils import otel as otel_hooks
 
 
 def get_weather(location: str) -> str:
@@ -36,13 +38,13 @@ def get_weather(location: str) -> str:
 async def run_basic_agent() -> None:
   """Runs a basic agent with a custom tool and prints OTel spans."""
   print("\n--- Running Basic Agent Tracing ---")
-  config = antigravity.LocalAgentConfig(
+  config = LocalAgentConfig(
       tools=[get_weather],
       policies=[],
       hooks=otel_hooks.get_otel_hooks(),
   )
 
-  async with antigravity.Agent(config) as my_agent:
+  async with Agent(config) as my_agent:
     prompt = "What is the weather in Paris?"
     print(f"  User: {prompt}")
     response = await my_agent.chat(prompt)
@@ -56,7 +58,7 @@ async def run_basic_agent() -> None:
 async def run_subagents() -> None:
   """Runs an agent that delegates to a subagent and prints OTel spans."""
   print("\n--- Running Subagents Tracing ---")
-  config = antigravity.LocalAgentConfig(
+  config = LocalAgentConfig(
       system_instructions=(
           "You are a poet manager. Delegate the poem writing to a specialized"
           " 'Poet' subagent."
@@ -64,7 +66,7 @@ async def run_subagents() -> None:
       hooks=otel_hooks.get_otel_hooks(),
   )
 
-  async with antigravity.Agent(config) as my_agent:
+  async with Agent(config) as my_agent:
     prompt = "Write a 4-line poem about space."
     print(f"  User: {prompt}")
     response = await my_agent.chat(prompt)

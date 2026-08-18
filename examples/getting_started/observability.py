@@ -40,7 +40,9 @@ from google.antigravity import LocalAgentConfig
 from google.antigravity.hooks import hooks
 
 # Enable DEBUG logging for the SDK to show detailed execution info.
-logging.getLogger("google.antigravity").setLevel(logging.DEBUG)
+logging.getLogger("google.antigravity").setLevel(
+    logging.DEBUG
+)
 logging.basicConfig(level=logging.DEBUG)
 
 

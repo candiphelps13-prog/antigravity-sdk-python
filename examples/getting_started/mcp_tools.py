@@ -33,11 +33,11 @@ import os
 from google.antigravity import Agent
 from google.antigravity import LocalAgentConfig
 from google.antigravity import types
-from google.antigravity.hooks import policy
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from resources import mcp_server
+from google.antigravity.hooks import policy
 
 
 async def mcp_stdio() -> None:

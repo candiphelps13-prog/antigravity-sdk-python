@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
     "absl-py",
     "google-genai>=1.0",
-    "mcp>=1.0",
+    "mcp>=1.0,<2.0",
     "pydantic>=2.0",
     "uvicorn>=0.46",
     "websockets>=12.0",

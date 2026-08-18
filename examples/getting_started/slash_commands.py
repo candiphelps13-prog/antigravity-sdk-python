@@ -30,7 +30,8 @@ import asyncio
 import os
 import tempfile
 
-from google import antigravity
+from google.antigravity import Agent
+from google.antigravity import LocalAgentConfig
 from google.antigravity import types
 from google.antigravity.hooks import policy
 
@@ -71,7 +72,7 @@ async def main() -> None:
     # workspaces: The directory where the agent reads and writes files.
     # app_data_dir: Where the agent stores session data (e.g. brain artifacts).
     # policies: Allows autonomous tool execution without user prompts.
-    config = antigravity.LocalAgentConfig(
+    config = LocalAgentConfig(
         workspaces=[tmpdir],
         app_data_dir=tmpdir,
         policies=policies,
@@ -80,7 +81,7 @@ async def main() -> None:
     # Programmatic slash command usage with /plan:
     # You can explicitly pass a `types.SlashCommand` primitive in the list
     # of prompt parts.
-    async with antigravity.Agent(config) as my_agent:
+    async with Agent(config) as my_agent:
       print("--- Programmatic Plan Slash Command (Part Object) ---")
       prompt = [
           types.SlashCommand(name=types.BuiltinSlashCommandName.PLAN),
