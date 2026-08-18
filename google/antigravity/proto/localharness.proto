@@ -717,6 +717,8 @@ message CustomAgent {
   repeated .antigravity.localharness.Tool tools = 5;
   .antigravity.localharness.SubagentSkillsConfig skills_config = 6;
   .antigravity.localharness.AgentBehavior agent_behavior = 7;
+  extensions 1000 to 1999;
+  extensions 2000 to max;
 }
 message ToolOutputTruncation {
   message TruncateStrategy {
