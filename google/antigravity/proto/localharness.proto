@@ -412,6 +412,7 @@ message ActionViewFile {
   string file_path = 1;
   uint32 start_line = 2;
   uint32 end_line = 3;
+  int32 content_offset = 4;
 }
 message ActionCreateFile {
   string file_path = 1;
