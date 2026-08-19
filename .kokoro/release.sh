@@ -121,9 +121,13 @@ if [[ -z "${PUBLISH_PREBUILT_VERSION:-}" ]]; then
 fi
 
 # --- Platform definitions ---
+# Note: Linux platforms use dual compressed platform tags (manylinux + musllinux per PEP 656).
+# Because localharness is compiled as a static ELF binary, the same wheel is installable
+# across standard glibc Linux distros (matching manylinux) and Alpine Linux (matching musllinux)
+# without building redundant wheel files.
 declare -A PLATFORM_TAGS=(
-  ["linux-x86_64"]="manylinux_2_17_x86_64"
-  ["linux-arm64"]="manylinux_2_17_aarch64"
+  ["linux-x86_64"]="manylinux_2_17_x86_64.musllinux_1_1_x86_64"
+  ["linux-arm64"]="manylinux_2_17_aarch64.musllinux_1_1_aarch64"
   ["darwin-arm64"]="macosx_11_0_arm64"
   ["windows-x86_64"]="win_amd64"
   ["windows-arm64"]="win_arm64"
