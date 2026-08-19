@@ -19,9 +19,8 @@ To run:
 
 Criteria for correct script performance:
   1. The script exits cleanly with return code 0 (no unhandled exceptions).
-  2. The agent produces non-empty streamed thought/reasoning content.
-  3. The agent produces a non-empty streamed final answer.
-  4. The response correctly identifies the answer to the riddle (an echo).
+  2. The agent produces a non-empty streamed final answer.
+  3. The response correctly identifies the answer to the riddle (an echo).
 """
 
 import asyncio
