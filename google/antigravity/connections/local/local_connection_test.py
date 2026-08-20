@@ -33,6 +33,7 @@ import pydantic
 import websockets
 
 from google.antigravity.proto import localharness_pb2
+from google.antigravity import models as models_lib
 from google.antigravity import types
 from google.antigravity.connections.local import event_processor
 from google.antigravity.connections.local import local_connection
@@ -41,9 +42,7 @@ from google.antigravity.connections.local import test_utils
 from google.antigravity.hooks import hook_runner
 from google.antigravity.hooks import hooks as hooks_base
 from google.antigravity.hooks import policy
-from google.antigravity.models import DEFAULT_MODEL
 from google.antigravity.tools import tool_runner
-from google.antigravity.types import QuestionResponse
 
 
 class PromptSanitizationTest(unittest.TestCase):
@@ -498,7 +497,7 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
     hr = hook_runner.HookRunner()
 
     @hooks_base.pre_turn
-    async def denying_turn(data):
+    async def denying_turn(_):
       return hooks_base.HookResult(allow=False, message="Denied by hook")
 
     hr.register_hook(denying_turn)
@@ -706,7 +705,8 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
     sent_data = await harness.wait_for_response()
     resp = sent_data["toolResponse"]
     self.assertEqual(resp["id"], "call_img")
-    # The text part stays in response_json; the image becomes supplemental media.
+    # The text part stays in response_json; the image becomes supplemental
+    # media.
     self.assertIn("here is the snapshot", resp["responseJson"])
     self.assertIn("supplementalMedia", resp)
     self.assertEqual(resp["supplementalMedia"][0]["mimeType"], "image/jpeg")
@@ -773,10 +773,10 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
     hr = hook_runner.HookRunner()
 
     @hooks_base.on_interaction
-    async def auto_answer(data):
+    async def auto_answer(_):
       return hooks_base.QuestionHookResult(
           responses=[
-              QuestionResponse(selected_option_ids=["1"]),
+              types.QuestionResponse(selected_option_ids=["1"]),
           ]
       )
 
@@ -817,10 +817,10 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
     hr = hook_runner.HookRunner()
 
     @hooks_base.on_interaction
-    async def auto_answer(data):
+    async def auto_answer(_):
       return hooks_base.QuestionHookResult(
           responses=[
-              QuestionResponse(selected_option_ids=["1"]),
+              types.QuestionResponse(selected_option_ids=["1"]),
           ]
       )
 
@@ -846,7 +846,8 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
                             choices=["Yes", "No"],
                         )
                     ),
-                    localharness_pb2.UserQuestion(),  # Unhandled question type (empty)
+                    # Unhandled question type (empty).
+                    localharness_pb2.UserQuestion(),
                 ]
             ),
         )
@@ -1210,7 +1211,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     # No models, system instructions, workspaces, or skills by default.
     self.assertEmpty(config.models)
     self.assertFalse(config.HasField("system_instructions"))
-    self.assertEqual(len(config.workspaces), 0)
+    self.assertEmpty(config.workspaces)
     self.assertEqual(
         config.agent_behavior, localharness_pb2.AGENT_BEHAVIOR_AUTONOMOUS
     )
@@ -1779,14 +1780,14 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     """
     strategy = self._make_strategy()
     config = strategy._build_harness_config()
-    self.assertEqual(len(config.workspaces), 0)
+    self.assertEmpty(config.workspaces)
 
   def test_models_thinking_level_set(self):
     """Verifies that thinking_level on ModelTarget maps to the proto field."""
     strategy = self._make_strategy(
         models=[
             types.ModelTarget(
-                name=DEFAULT_MODEL,
+                name=models_lib.DEFAULT_MODEL,
                 types=[types.ModelType.TEXT],
                 endpoint=types.GeminiAPIEndpoint(
                     options=types.GeminiModelOptions(
@@ -1806,7 +1807,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     strategy = self._make_strategy(
         models=[
             types.ModelTarget(
-                name=DEFAULT_MODEL,
+                name=models_lib.DEFAULT_MODEL,
                 types=[types.ModelType.TEXT],
                 endpoint=types.GeminiAPIEndpoint(
                     options=types.GeminiModelOptions(thinking_level=None),
@@ -1823,7 +1824,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
       strategy = self._make_strategy(
           models=[
               types.ModelTarget(
-                  name=DEFAULT_MODEL,
+                  name=models_lib.DEFAULT_MODEL,
                   types=[types.ModelType.TEXT],
                   endpoint=types.GeminiAPIEndpoint(
                       options=types.GeminiModelOptions(thinking_level=level),
@@ -1844,7 +1845,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     strategy = self._make_strategy(
         models=[
             types.ModelTarget(
-                name=DEFAULT_MODEL,
+                name=models_lib.DEFAULT_MODEL,
                 types=[types.ModelType.TEXT],
                 endpoint=types.GeminiAPIEndpoint(
                     options=types.GeminiModelOptions(
@@ -1864,7 +1865,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     strategy = self._make_strategy(
         models=[
             types.ModelTarget(
-                name=DEFAULT_MODEL,
+                name=models_lib.DEFAULT_MODEL,
                 types=[types.ModelType.TEXT],
                 endpoint=types.GeminiAPIEndpoint(
                     options=types.GeminiModelOptions(service_tier=None),
@@ -1881,7 +1882,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
       strategy = self._make_strategy(
           models=[
               types.ModelTarget(
-                  name=DEFAULT_MODEL,
+                  name=models_lib.DEFAULT_MODEL,
                   types=[types.ModelType.TEXT],
                   endpoint=types.GeminiAPIEndpoint(
                       options=types.GeminiModelOptions(service_tier=tier),
@@ -1901,7 +1902,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     strategy = self._make_strategy(
         models=[
             types.ModelTarget(
-                name=DEFAULT_MODEL,
+                name=models_lib.DEFAULT_MODEL,
                 types=[types.ModelType.TEXT],
                 endpoint=types.VertexEndpoint(
                     project="test-project",
@@ -2051,7 +2052,7 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
     )
     config = strategy._build_harness_config()
     self.assertEqual(config.cascade_id, "session-789")
-    self.assertEqual(len(config.workspaces), 1)
+    self.assertLen(config.workspaces, 1)
     self.assertEqual(
         config.workspaces[0].filesystem_workspace.directory, "/ws/a"
     )
@@ -2731,9 +2732,22 @@ _get_default_binary_path = local_connection._get_default_binary_path
 
 class GetDefaultBinaryPathTest(unittest.TestCase):
 
-  @mock.patch.dict("os.environ", {"ANTIGRAVITY_HARNESS_PATH": "/env/path"})
-  def test_returns_env_path(self):
-    path = _get_default_binary_path()
+  @mock.patch.dict(
+      "os.environ",
+      {"ANTIGRAVITY_HARNESS_PATH": "/I/should/not/be/used"},
+  )
+  def test_returns_env_path_via_passed_env(self):
+    path = _get_default_binary_path(
+        env={"ANTIGRAVITY_HARNESS_PATH": "/I/should/be/used"}
+    )
+    self.assertEqual(path, "/I/should/be/used")
+
+  @mock.patch.dict(
+      "os.environ",
+      {"ANTIGRAVITY_HARNESS_PATH": "/env/path"}
+  )
+  def test_returns_env_path_via_global_env(self):
+    path = _get_default_binary_path(env={"not_harness_path": "different_value"})
     self.assertEqual(path, "/env/path")
 
   @mock.patch.dict("os.environ", {}, clear=True)
@@ -2751,7 +2765,7 @@ class GetDefaultBinaryPathTest(unittest.TestCase):
     mock_dist.return_value = mock_distribution
     mock_exists.return_value = True
 
-    path = _get_default_binary_path()
+    path = _get_default_binary_path(env=None)
     self.assertEqual(path, "/site-packages/google/antigravity/bin/localharness")
     mock_dist.assert_called_once_with("google-antigravity")
     mock_file.locate.assert_called_once()
@@ -2769,7 +2783,7 @@ class GetDefaultBinaryPathTest(unittest.TestCase):
     mock_files.return_value = mock_path
     mock_exists.return_value = True
 
-    path = _get_default_binary_path()
+    path = _get_default_binary_path(env={})
     self.assertEqual(path, "/wheel/path")
 
   @mock.patch.dict("os.environ", {}, clear=True)
@@ -2781,7 +2795,7 @@ class GetDefaultBinaryPathTest(unittest.TestCase):
     mock_files.side_effect = ImportError
     mock_which.return_value = "/system/path"
 
-    path = _get_default_binary_path()
+    path = _get_default_binary_path(env={})
     self.assertEqual(path, "/system/path")
     mock_which.assert_called_once_with("localharness")
 
@@ -2795,7 +2809,7 @@ class GetDefaultBinaryPathTest(unittest.TestCase):
     mock_which.return_value = None
 
     with self.assertRaises(RuntimeError) as ctx:
-      _get_default_binary_path()
+      _get_default_binary_path(env={})
     self.assertIn(
         "Could not find default localharness binary", str(ctx.exception)
     )
@@ -3267,7 +3281,7 @@ class LocalConnectionToolCallHooksTest(unittest.IsolatedAsyncioTestCase):
     """
     tr = tool_runner.ToolRunner()
 
-    async def failing_handler(**kwargs):
+    async def failing_handler(**_):
       raise RuntimeError("Intentional failure")
 
     tr.register(failing_handler, "failing_tool")
@@ -3934,7 +3948,7 @@ class LocalAgentConfigTest(absltest.TestCase):
   def test_merge_models_only_defaults(self):
     config = local_connection_config.LocalAgentConfig()
     self.assertLen(config.models, 2)
-    self.assertEqual(config.models[0].name, DEFAULT_MODEL)
+    self.assertEqual(config.models[0].name, models_lib.DEFAULT_MODEL)
     self.assertEqual(config.models[0].types, [types.ModelType.TEXT])
     self.assertEqual(
         config.models[1].name,
@@ -3961,7 +3975,7 @@ class LocalAgentConfigTest(absltest.TestCase):
     self.assertLen(config.models, 2)
     self.assertEqual(config.models[0].name, "custom-image-model")
     self.assertEqual(config.models[0].types, [types.ModelType.IMAGE])
-    self.assertEqual(config.models[1].name, DEFAULT_MODEL)
+    self.assertEqual(config.models[1].name, models_lib.DEFAULT_MODEL)
     self.assertEqual(config.models[1].types, [types.ModelType.TEXT])
 
   def test_merge_models_explicit_and_shorthand(self):

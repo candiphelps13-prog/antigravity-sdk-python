@@ -631,13 +631,20 @@ def _get_sdk_version() -> str:
     return "0.0.0-dev"
 
 
-def _get_default_binary_path_external() -> str:
+_HARNESS_PATH_ENV_VAR = "ANTIGRAVITY_HARNESS_PATH"
+
+
+def _get_default_binary_path_external(env: dict[str, str] | None) -> str:
   """Returns the default localharness binary path."""
-  # 1. Check environment variable first
-  if harness_path := os.environ.get("ANTIGRAVITY_HARNESS_PATH"):
+  # 1. Check passed value in env first.
+  if env and _HARNESS_PATH_ENV_VAR in env:
+    return env[_HARNESS_PATH_ENV_VAR]
+
+  # 2. Check variable in os.environ.
+  if harness_path := os.environ.get(_HARNESS_PATH_ENV_VAR):
     return harness_path
 
-  # 2. Try importlib.metadata (Robust wheel discovery)
+  # 3. Try importlib.metadata (Robust wheel discovery)
   # This is immune to sys.path shadowing by a local repository directory.
   try:
     dist = importlib.metadata.distribution("google-antigravity")
@@ -654,7 +661,7 @@ def _get_default_binary_path_external() -> str:
   except (importlib.metadata.PackageNotFoundError, ValueError, AttributeError):
     pass
 
-  # 3. Try importlib.resources (External Wheel fallback)
+  # 4. Try importlib.resources (External Wheel fallback)
   try:
     # Using 'google.antigravity' as the package name.
     # This assumes the binary is located at google/antigravity/bin/localharness
@@ -672,14 +679,14 @@ def _get_default_binary_path_external() -> str:
   except (ImportError, AttributeError, KeyError):
     pass
 
-  # 4. Fallback: Check if it's in the system PATH
+  # 5. Fallback: Check if it's in the system PATH
   if path := shutil.which("localharness"):
     return path
 
   raise RuntimeError(
       "Could not find default localharness binary. "
       "Please specify binary_path explicitly, set the "
-      "ANTIGRAVITY_HARNESS_PATH environment variable, or ensure it is in your "
+      f"{_HARNESS_PATH_ENV_VAR} environment variable, or ensure it is in your "
       "PATH. Note: If you are running from the root of the repository, the "
       "local source tree might shadow your pip-installed package and prevent "
       "resource discovery."
@@ -815,7 +822,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       budget_config: Optional session budget configuration.
       policies: Optional list of policy rules for the Go evaluator.
     """
-    self._binary_path = _get_default_binary_path()
+    self._binary_path = _get_default_binary_path(env)
     self._tool_runner = tool_runner
     self._hook_runner = hook_runner
     self._connection: LocalConnection | None = None
