@@ -27,6 +27,7 @@ enum LifecycleHook {
   LIFECYCLE_HOOK_PRE_TOOL = 5;
   LIFECYCLE_HOOK_POST_TOOL = 6;
   LIFECYCLE_HOOK_ON_TOOL_ERROR = 7;
+  LIFECYCLE_HOOK_ON_COMPACTION = 8;
 }
 enum AgentBehavior {
   AGENT_BEHAVIOR_UNSPECIFIED = 0;
@@ -633,6 +634,7 @@ message CallHookRequest {
     .antigravity.localharness.PreToolArgs pre_tool_args = 5;
     .antigravity.localharness.PostToolArgs post_tool_args = 6;
     .antigravity.localharness.OnToolErrorArgs on_tool_error_args = 8;
+    .antigravity.localharness.OnCompactionArgs on_compaction_args = 9;
   }
   string request_id = 1;
   string name = 2;
@@ -680,6 +682,11 @@ message PreTurnArgs {
 message PostTurnArgs {
   string response_text = 1;
   string trajectory_id = 2;
+}
+message OnCompactionArgs {
+  string trajectory_id = 1;
+  uint32 step_index = 2;
+  string summary = 3;
 }
 message EmptyResult {}
 message OnToolErrorResult {

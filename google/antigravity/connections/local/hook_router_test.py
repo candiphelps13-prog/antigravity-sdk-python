@@ -23,6 +23,7 @@ from google.antigravity import types
 from google.antigravity.connections.local import event_processor
 from google.antigravity.connections.local import types as local_types
 from google.antigravity.connections.local.hook_router import HookRouter
+from google.antigravity.connections.local.hook_router import make_step_id
 from google.antigravity.hooks import hook_runner as h_runner
 from google.antigravity.hooks import hooks
 
@@ -100,6 +101,104 @@ class HookRouterTest(absltest.TestCase):
       resp = sent_events[0].call_hook_response
       self.assertEqual(resp.request_id, "test_req_end")
       self.assertTrue(resp.HasField("empty_result"))
+
+    asyncio.run(_test())
+
+  def test_handle_on_compaction(self):
+
+    async def _test():
+      captured_step = []
+
+      class MyCompactionHook(hooks.OnCompactionHook):
+
+        async def run(self, context, data):
+          captured_step.append(data)
+
+      hook_runner = h_runner.HookRunner(
+          on_compaction_hooks=[MyCompactionHook()],
+      )
+
+      sent_events = []
+
+      async def mock_send(event: localharness_pb2.InputEvent):
+        sent_events.append(event)
+
+      router = HookRouter(hook_runner, mock_send)
+
+      req = localharness_pb2.CallHookRequest(
+          request_id="test_req_compaction",
+          name="OnCompaction",
+          type=localharness_pb2.LIFECYCLE_HOOK_ON_COMPACTION,
+          on_compaction_args=localharness_pb2.OnCompactionArgs(
+              trajectory_id="traj-123",
+              step_index=5,
+              summary="Custom compaction summary",
+          ),
+      )
+
+      await router.handle(req)
+
+      self.assertLen(captured_step, 1)
+      self.assertEqual(captured_step[0].id, make_step_id("traj-123", 5))
+      self.assertEqual(captured_step[0].type, types.StepType.COMPACTION)
+      self.assertEqual(captured_step[0].status, types.StepStatus.DONE)
+      self.assertEqual(captured_step[0].source, types.StepSource.SYSTEM)
+      self.assertEqual(captured_step[0].target, types.StepTarget.USER)
+      self.assertEqual(captured_step[0].content, "Custom compaction summary")
+      self.assertEqual(captured_step[0].trajectory_id, "traj-123")
+      self.assertEqual(captured_step[0].step_index, 5)
+
+      self.assertLen(sent_events, 1)
+      self.assertTrue(sent_events[0].HasField("call_hook_response"))
+      resp = sent_events[0].call_hook_response
+      self.assertEqual(resp.request_id, "test_req_compaction")
+      self.assertTrue(resp.HasField("empty_result"))
+
+    asyncio.run(_test())
+
+  def test_handle_on_compaction_default_summary(self):
+    async def _test():
+      captured_step = []
+
+      class MyDefaultCompactionHook(hooks.OnCompactionHook):
+
+        async def run(self, context, data):
+          captured_step.append(data)
+
+      hr = h_runner.HookRunner(
+          on_compaction_hooks=[MyDefaultCompactionHook()],
+      )
+
+      sent_events = []
+
+      async def mock_send(event: localharness_pb2.InputEvent):
+        sent_events.append(event)
+
+      router = HookRouter(hr, mock_send)
+
+      req = localharness_pb2.CallHookRequest(
+          request_id="test_req_comp_def",
+          name="OnCompaction",
+          type=localharness_pb2.LIFECYCLE_HOOK_ON_COMPACTION,
+          on_compaction_args=localharness_pb2.OnCompactionArgs(
+              trajectory_id="traj-def",
+              step_index=2,
+              summary="",
+          ),
+      )
+
+      await router.handle(req)
+
+      self.assertLen(captured_step, 1)
+      self.assertEqual(captured_step[0].content, "Context compaction")
+      self.assertEqual(captured_step[0].source, types.StepSource.SYSTEM)
+      self.assertEqual(captured_step[0].target, types.StepTarget.USER)
+
+      self.assertLen(sent_events, 1)
+      self.assertTrue(sent_events[0].HasField("call_hook_response"))
+      self.assertTrue(
+          sent_events[0].call_hook_response.HasField("empty_result")
+      )
 
     asyncio.run(_test())
 

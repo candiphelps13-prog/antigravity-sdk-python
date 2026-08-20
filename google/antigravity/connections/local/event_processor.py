@@ -569,14 +569,6 @@ class LocalHarnessEventProcessor:
             self._get_turn_context(), step_obj
         )
 
-      # Dispatch observe-only hooks
-      if step_obj.type == types.StepType.COMPACTION and self._hook_runner:
-        self._run_in_background(
-            self._hook_runner.dispatch_compaction(
-                self._get_turn_context(), step_obj
-            )
-        )
-
       # Process wait requests if this is a wait state
       if (
           step_update.state

@@ -3145,7 +3145,8 @@ class LocalConnectionCompactionHookTest(unittest.IsolatedAsyncioTestCase):
 
       async def run(self, context, data):  # pylint: disable=unused-argument
         captured.append(data)
-        event.set()
+        if len(captured) == 1:
+          event.set()
 
     hr = hook_runner.HookRunner()
     hr.register_hook(CompactionHook())
@@ -3156,24 +3157,47 @@ class LocalConnectionCompactionHookTest(unittest.IsolatedAsyncioTestCase):
         hook_runner=hr,
     )
 
-    output_event = localharness_pb2.OutputEvent(
-        step_update=localharness_pb2.StepUpdate(
+    req = localharness_pb2.CallHookRequest(
+        request_id="req_comp_1",
+        name="OnCompaction",
+        type=localharness_pb2.LIFECYCLE_HOOK_ON_COMPACTION,
+        on_compaction_args=localharness_pb2.OnCompactionArgs(
+            trajectory_id="main",
             step_index=1,
-            text="Context compaction",
-            state=localharness_pb2.StepUpdate.STATE_DONE,
-            source=localharness_pb2.StepUpdate.SOURCE_SYSTEM,
-            target=localharness_pb2.StepUpdate.TARGET_USER,
-            compaction=localharness_pb2.ActionCompaction(),
-        )
+            summary="Context compaction",
+        ),
     )
-
+    output_event = localharness_pb2.OutputEvent(call_hook_request=req)
     await harness.send_event(output_event)
-    await asyncio.wait_for(event.wait(), timeout=1.0)
 
+    await asyncio.wait_for(event.wait(), timeout=1.0)
     self.assertEqual(len(captured), 1)
-    self.assertIsInstance(captured[0], local_connection.LocalConnectionStep)
     self.assertEqual(captured[0].type, types.StepType.COMPACTION)
     self.assertEqual(captured[0].content, "Context compaction")
+    self.assertEqual(captured[0].status, types.StepStatus.DONE)
+    self.assertEqual(captured[0].source, types.StepSource.SYSTEM)
+    self.assertEqual(captured[0].target, types.StepTarget.USER)
+    self.assertEqual(captured[0].trajectory_id, "main")
+    self.assertEqual(captured[0].step_index, 1)
+
+    resp = await harness.wait_for_response(timeout=1.0)
+    self.assertIn("callHookResponse", resp)
+    self.assertEqual(resp["callHookResponse"]["requestId"], "req_comp_1")
+    self.assertIn("emptyResult", resp["callHookResponse"])
+
+  def test_get_enabled_hooks_includes_on_compaction(self):
+    """Verifies _get_enabled_hooks includes LIFECYCLE_HOOK_ON_COMPACTION."""
+    hr = hook_runner.HookRunner()
+
+    class CompactionHook(hooks_base.OnCompactionHook):
+
+      async def run(self, context, data):
+        pass
+
+    hr.register_hook(CompactionHook())
+    strategy = local_connection.LocalConnectionStrategy(hook_runner=hr)
+    enabled = strategy._get_enabled_hooks()
+    self.assertIn(localharness_pb2.LIFECYCLE_HOOK_ON_COMPACTION, enabled)
 
 
 class LocalConnectionSubagentHookTest(unittest.IsolatedAsyncioTestCase):

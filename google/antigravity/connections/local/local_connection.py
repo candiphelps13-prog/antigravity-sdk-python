@@ -1186,6 +1186,10 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
             self._hook_runner.on_tool_error_hooks,
             localharness_pb2.LIFECYCLE_HOOK_ON_TOOL_ERROR,
         ),
+        (
+            self._hook_runner.on_compaction_hooks,
+            localharness_pb2.LIFECYCLE_HOOK_ON_COMPACTION,
+        ),
     ]
     for hooks_list, hook_type in hook_mapping:
       if hooks_list:

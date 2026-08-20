@@ -14,16 +14,18 @@
 
 """Tests for event_processor that translates wire events to SDK events."""
 
+import asyncio
+import json
 import unittest
 from unittest import mock
 
 from absl.testing import absltest
 from google.protobuf import json_format
-
 from google.antigravity.proto import localharness_pb2
 from google.antigravity import types
 from google.antigravity.connections.local import event_processor
 from google.antigravity.connections.local import types as local_types
+from google.antigravity.hooks import policy
 
 
 MAIN_TRAJECTORY_ID = "cbb3a5135a32671ae8152a25a857c4bc"
@@ -742,11 +744,6 @@ class LocalHarnessEventProcessorTest(unittest.IsolatedAsyncioTestCase):
     self.assertEqual(len(step.tool_calls), 1)
     self.assertEqual(step.tool_calls[0].name, "my_remote_tool")
     self.assertEqual(step.type, types.StepType.TOOL_CALL)
-
-import asyncio
-import json
-
-from google.antigravity.hooks import policy
 
 
 def _make_policy_decision_request(

@@ -113,6 +113,9 @@ class HookRouter:
             self._handle_on_tool_error
         ),
         localharness_pb2.LIFECYCLE_HOOK_PRE_TOOL: self._handle_pre_tool,
+        localharness_pb2.LIFECYCLE_HOOK_ON_COMPACTION: (
+            self._handle_on_compaction
+        ),
     }
 
   @property
@@ -313,6 +316,34 @@ class HookRouter:
       )
     else:
       resp.empty_result.CopyFrom(localharness_pb2.EmptyResult())
+
+  async def _handle_on_compaction(
+      self,
+      req: localharness_pb2.CallHookRequest,
+      resp: localharness_pb2.CallHookResponse,
+  ) -> None:
+    """Handles an incoming LIFECYCLE_HOOK_ON_COMPACTION CallHookRequest."""
+    args = (
+        req.on_compaction_args
+        if req.HasField("on_compaction_args")
+        else localharness_pb2.OnCompactionArgs()
+    )
+    step_id = make_step_id(args.trajectory_id, args.step_index)
+    step_obj = types.Step(
+        id=step_id,
+        type=types.StepType.COMPACTION,
+        status=types.StepStatus.DONE,
+        source=types.StepSource.SYSTEM,
+        target=types.StepTarget.USER,
+        content=args.summary or "Context compaction",
+        trajectory_id=args.trajectory_id or "",
+        step_index=args.step_index,
+    )
+    turn_ctx = self._current_turn_context or hooks.TurnContext(
+        self._hook_runner.session_context
+    )
+    await self._hook_runner.dispatch_compaction(turn_ctx, step_obj)
+    resp.empty_result.CopyFrom(localharness_pb2.EmptyResult())
 
   async def handle(self, req: localharness_pb2.CallHookRequest) -> None:
     """Handles an incoming CallHookRequest and sends a CallHookResponse back to the harness."""
