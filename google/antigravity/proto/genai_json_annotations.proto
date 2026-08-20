@@ -1,0 +1,231 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+edition = "2024";
+
+package gaos.parsing;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.OneofOptions {
+  // Marks a `oneof` as a union. Instead of wrapping the active field in an
+  // object keyed by the field name, the content of the active field is
+  // flattened directly into the parent JSON object.
+  //
+  // See go/gaos-annotations#is_union for details and examples.
+  //
+  // Example:
+  //   message MyUnion {
+  //     oneof content {
+  //       option (gaos.parsing.is_union) = true;
+  //       string text = 1;
+  //       int32 number = 2;
+  //     }
+  //   }
+  // Proto `text: "hello"` -> JSON: `"hello"` (if used as a primitive union)
+  // or flattened into the parent object.
+  bool is_union = 525000029;
+
+  // Marks a `oneof` as containing subtype messages for polymorphic resolution.
+  // Supports both Explicit mode (using `json_discriminator` on fields) and
+  // Implicit mode (using the `oneof` name as the JSON key).
+  //
+  // See go/gaos-annotations#subtype_source for details and examples.
+  bool subtype_source = 525000030;
+
+  // Indicates that the `oneof` must have one of its fields set.
+  // This is used by the OAD generator to mark the field as required
+  // in the OpenAPI specification.
+  //
+  // See go/gaos-annotations#is_required for details and examples.
+  bool is_required = 525000031;
+
+  // The name of the union to be used in the generated OpenAPI schema.
+  // If not set, defaults to the oneof name.
+  //
+  // See go/gaos-annotations#union_name for details and examples.
+  string union_name = 525000032;
+}
+
+enum JsonType {
+  JSON_TYPE_UNSPECIFIED = 0;
+  JSON_TYPE_OBJECT = 1;
+  JSON_TYPE_ARRAY = 2;
+  JSON_TYPE_VALUE = 3;
+}
+
+extend google.protobuf.FieldOptions {
+  // Used in explicit union mode. Specifies the JSON key that acts as the
+  // discriminator to determine which field of a `oneof` should be populated.
+  // If not set, implicit mode is used (using the `oneof` name as key).
+  //
+  // See go/gaos-annotations#json_discriminator for details and examples.
+  string json_discriminator = 525000215;
+
+  // Specifies the value that the discriminator key must have in the JSON
+  // payload to map to this specific field.
+  //
+  // See go/gaos-annotations#json_discriminator_value for details and examples.
+  //
+  // Example:
+  //   message ObjectUnion {
+  //     oneof content {
+  //       option (gaos.parsing.is_union) = true;
+  //       MessageA a = 1 [
+  //         (gaos.parsing.json_discriminator) = "type",
+  //         (gaos.parsing.json_discriminator_value) = "A"
+  //       ];
+  //     }
+  //   }
+  // JSON `{"type": "A", ...}` will be parsed into field `a` (MessageA).
+  string json_discriminator_value = 525000216;
+
+  // Delegates subtype resolution to a field's message type.
+  // The field's message type must itself be a supertype. The parser flattens
+  // both the parent and subtype fields into a single JSON object.
+  //
+  // See go/gaos-annotations#subtype_source_field for details and examples.
+  bool subtype_source_field = 525000217;
+
+  // Similar to `json_discriminator`, but the key does NOT correspond to a real
+  // proto field in the target message. It is used for routing during parsing
+  // and injected during serialization.
+  //
+  // See go/gaos-annotations#json_only_discriminator for details and examples.
+  //
+  // Example:
+  //   message MessageA {
+  //     string value = 1;
+  //     reserved type; // 'type' is not in proto
+  //   }
+  // JSON `{"type": "A", "value": "foo"}` -> Proto `value: "foo"`.
+  // The `"type": "A"` is used to select `MessageA` but not stored.
+  string json_only_discriminator = 525000218;
+
+  // Used on a `genai.Struct` field. Any properties in the JSON object that do
+  // not match known proto fields are collected into this struct. During
+  // serialization, these properties are flattened back into the parent object.
+  //
+  // See go/gaos-annotations#additional_properties for details and examples.
+  //
+  // Example:
+  //   message MyMessage {
+  //     string name = 1;
+  //     .genai.Struct extra = 2 [(gaos.parsing.additional_properties) =
+  //     true];
+  //   }
+  // JSON `{"name": "test", "foo": "bar"}` -> Proto `name: "test"`,
+  // `extra: {fields { key: "foo" value { string_value: "bar" } } }`.
+  bool additional_properties = 525000219;
+
+  // Allows specifying multiple discriminator values that map to this field.
+  // This is used in implicit/explicit union mode when multiple JSON
+  // discriminator values should resolve to the same proto field.
+  //
+  // See go/gaos-annotations#json_discriminator_values for details and examples.
+  repeated string json_discriminator_values = 525000220;
+
+  // Allows a field to also be parsed from a shorthand JSON form.
+  //
+  // The annotation value is a dot-separated path starting with the annotated
+  // field's own name. When present, the parser accepts either the full nested
+  // JSON object or just the descendant's value directly.
+  //
+  // See go/gaos-annotations#add_union_value for details and examples.
+  //
+  // Example:
+  //
+  //   message Inner {
+  //     repeated string texts = 1;
+  //     int32 num = 2;
+  //   }
+  //   message Outer {
+  //     Inner inner = 1 [
+  //       (gaos.parsing.add_union_value) = "inner.texts",
+  //       (gaos.parsing.add_union_value) = "inner.texts[0]",
+  //       (gaos.parsing.add_union_value) = "inner.num"
+  //     ];
+  //   }
+  //
+  //   // All of these parse into an Outer message:
+  //   { "inner": { "texts": ["a"], "num": 1 } }  // full form
+  //   { "inner": ["a", "b"] }                // shorthand (via "inner.texts")
+  //   { "inner": "a" }                       // shorthand(via "inner.texts[0]")
+  //   { "inner": 42 }                        //   shorthand (via "inner.num")
+  //
+  // Serialization always produces the full form.
+  //
+  // For repeated fields, a path ending on the repeated field accepts an
+  // array; appending "[0]" accepts a single value and auto-wraps it into a
+  // one-element list.
+  //
+  // Multiple annotations are allowed on the same field, but each must
+  // resolve to a distinct JSON type.
+  repeated string add_union_value = 525000221;
+
+  // Used on map fields. Allows the map to be parsed from either a standard JSON
+  // object or a JSON array of key-value objects.
+  //
+  // See go/gaos-annotations#flexible_map for details and examples.
+  bool flexible_map = 525000222;
+
+  // Specifies the target schema name to be generated for sub-content union
+  // definitions in OpenAPI generation. Example:
+  // [(gaos.parsing.sub_content_name) = "ThoughtSummaryContent"]
+  string sub_content_name = 525000227;
+}
+
+extend google.protobuf.EnumValueOptions {
+  // Overrides the string representation of an enum value in JSON.
+  //
+  // See go/gaos-annotations#enum_value_name for details and examples.
+  //
+  // Example:
+  //   enum MyEnum {
+  //     ENUM_VALUE_FOO = 1 [(gaos.parsing.enum_value_name) = "foo"];
+  //   }
+  // Proto `ENUM_VALUE_FOO` -> JSON `"foo"`.
+  string enum_value_name = 535802949;
+}
+
+// A fixed key-value pair that exists in the JSON representation but does not
+// correspond to any proto field. During deserialization, the parser strips this
+// key from the JSON input. This is useful for messages like Interaction that
+// have a `reserved object;` field and expect `{"object": "interaction"}` in
+// the JSON payload.
+message StaticJsonField {
+  string key = 1;
+  string value = 2;
+}
+
+extend google.protobuf.MessageOptions {
+  // Injects a fixed key-value pair into the JSON representation of the message.
+  // Useful for adding type tags required by external APIs.
+  //
+  // See go/gaos-annotations#add_static_field for details and examples.
+  //
+  // Example:
+  //   message MyMessage {
+  //     option (gaos.parsing.add_static_field) = { key: "object", value:
+  //     "interaction" }; string name = 1;
+  //   }
+  // Proto `name: "test"` -> JSON `{"object": "interaction", "name": "test"}`.
+  StaticJsonField add_static_field = 535801962;
+
+  // Specifies the JSON representation of this message type.
+  // When set, all fields of this type are automatically treated
+  // according to the specified JSON type by the parser, serializer,
+  // and OAD generator.
+  JsonType message_json_type = 535801963;
+}
