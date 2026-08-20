@@ -675,9 +675,11 @@ message OnToolErrorArgs {
 }
 message PreTurnArgs {
   .antigravity.localharness.UserInput user_input = 1;
+  string trajectory_id = 2;
 }
 message PostTurnArgs {
   string response_text = 1;
+  string trajectory_id = 2;
 }
 message EmptyResult {}
 message OnToolErrorResult {
