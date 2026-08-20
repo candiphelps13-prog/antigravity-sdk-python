@@ -102,8 +102,9 @@ class Agent:
             "to selectively allow specific tools."
         )
 
-      all_tools = list(self._config.tools)
-      self._tool_runner = tool_runner.ToolRunner(tools=all_tools)
+      self._tool_runner = tool_runner.ToolRunner(
+          tools=self._config._get_all_custom_tools()
+      )
 
       self._strategy = self._config.create_strategy(
           tool_runner=self._tool_runner,

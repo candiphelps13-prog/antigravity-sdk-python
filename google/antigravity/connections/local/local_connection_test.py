@@ -4651,32 +4651,122 @@ class LocalConnectionSubagentsTest(unittest.IsolatedAsyncioTestCase):
     self.assertEqual(appended.appended_sections[0].title, "Section1")
     self.assertEqual(appended.appended_sections[0].content, "Content1")
 
-  def test_subagent_tool_not_registered_raises(self):
-    def unregistered_tool():
-      """Not added to parent."""
+  def test_subagent_exclusive_tool_scoping(self):
+    def main_tool():
+      """Main agent tool."""
+
+    def sub_tool():
+      """Subagent exclusive tool."""
 
     subagent = types.SubagentConfig(
         name="test_helper",
         description="A helpful subagent",
-        tools=[unregistered_tool],
+        tools=[sub_tool],
+    )
+
+    tr = tool_runner.ToolRunner(tools=[main_tool, sub_tool])
+
+    strategy = local_connection.LocalConnectionStrategy(
+        subagents=[subagent],
+        workspaces=[str(self.workspace)],
+        tool_runner=tr,
+        tools=[main_tool],
+    )
+
+    harness_config = strategy._build_harness_config()
+
+    # Main agent tools should only have main_tool.
+    self.assertEqual([t.name for t in harness_config.tools], ["main_tool"])
+    # Subagent tools should only have sub_tool.
+    self.assertEqual(len(harness_config.custom_subagents), 1)
+    self.assertEqual(
+        [t.name for t in harness_config.custom_subagents[0].tools],
+        ["sub_tool"],
+    )
+
+  def test_subagent_exclusive_callable_tool_resolved_automatically(self):
+    def sub_only_tool():
+      """Only on subagent without tool_runner."""
+
+    subagent = types.SubagentConfig(
+        name="test_helper",
+        description="A helpful subagent",
+        tools=[sub_only_tool],
     )
 
     strategy = local_connection.LocalConnectionStrategy(
         subagents=[subagent],
         workspaces=[str(self.workspace)],
+        tools=[],
     )
 
-    with self.assertRaisesRegex(
-        ValueError,
-        "Subagent tool 'unregistered_tool' is not registered on the main agent"
-        " config",
-    ):
-      strategy._build_harness_config()
+    harness_config = strategy._build_harness_config()
 
-  def test_subagent_harness_tools_as_strings_raise_if_not_registered(self):
+    self.assertEqual(len(harness_config.tools), 0)
+    self.assertEqual(len(harness_config.custom_subagents), 1)
+    self.assertEqual(
+        [t.name for t in harness_config.custom_subagents[0].tools],
+        ["sub_only_tool"],
+    )
+
+  def test_subagent_callable_functor_without_name(self):
+    class FunctorTool:
+
+      def __call__(self, x: int) -> int:
+        """A functor tool."""
+        return x * 2
+
+    functor = FunctorTool()
     subagent = types.SubagentConfig(
-        name="test_helper",
-        description="A helpful subagent",
+        name="functor_helper",
+        description="Helper with functor",
+        tools=[functor],
+    )
+
+    strategy = local_connection.LocalConnectionStrategy(
+        subagents=[subagent],
+        workspaces=[str(self.workspace)],
+        tools=[],
+    )
+
+    harness_config = strategy._build_harness_config()
+    self.assertEqual(len(harness_config.custom_subagents), 1)
+    self.assertEqual(
+        [t.name for t in harness_config.custom_subagents[0].tools],
+        ["FunctorTool"],
+    )
+
+  def test_build_harness_config_tools_none_fallback(self):
+    def root_tool():
+      """Root tool."""
+
+    def sub_tool():
+      """Sub tool."""
+
+    subagent = types.SubagentConfig(
+        name="sub",
+        description="sub",
+        tools=[sub_tool],
+    )
+    tr = tool_runner.ToolRunner(tools=[root_tool, sub_tool])
+    strategy = local_connection.LocalConnectionStrategy(
+        subagents=[subagent],
+        workspaces=[str(self.workspace)],
+        tool_runner=tr,
+        # tools not specified (None)
+    )
+
+    harness_config = strategy._build_harness_config()
+    self.assertEqual([t.name for t in harness_config.tools], ["root_tool"])
+    self.assertEqual(
+        [t.name for t in harness_config.custom_subagents[0].tools],
+        ["sub_tool"],
+    )
+
+  def test_subagent_string_named_tools_builds_tool_protos(self):
+    subagent = types.SubagentConfig(
+        name="string_tool_helper",
+        description="Helper with string tools",
         tools=["view_file", "code_search"],
     )
 
@@ -4685,9 +4775,28 @@ class LocalConnectionSubagentsTest(unittest.IsolatedAsyncioTestCase):
         workspaces=[str(self.workspace)],
     )
 
+    harness_config = strategy._build_harness_config()
+    self.assertEqual(len(harness_config.custom_subagents), 1)
+    self.assertEqual(
+        [t.name for t in harness_config.custom_subagents[0].tools],
+        ["view_file", "code_search"],
+    )
+
+  def test_subagent_invalid_tool_type_raises_value_error(self):
+    subagent = types.SubagentConfig.model_construct(
+        name="invalid_helper",
+        description="Helper with invalid tool",
+        tools=[12345],  # pytype: disable=wrong-arg-types
+    )
+
+    strategy = local_connection.LocalConnectionStrategy(
+        subagents=[subagent],
+        workspaces=[str(self.workspace)],
+    )
+
     with self.assertRaisesRegex(
         ValueError,
-        "Subagent tool 'view_file' is not registered on the main agent config",
+        "Invalid tool type in subagent 'invalid_helper' tools list: 12345",
     ):
       strategy._build_harness_config()
 

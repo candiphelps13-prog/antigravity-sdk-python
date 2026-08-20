@@ -340,4 +340,5 @@ class LocalAgentConfig(BaseLocalAgentConfig):
         retry_config=self.retry_config,
         budget_config=self.budget_config,
         policies=list(self.policies) if self.policies is not None else None,
+        tools=self.tools,
     )

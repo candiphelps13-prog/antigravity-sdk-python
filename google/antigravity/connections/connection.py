@@ -54,7 +54,7 @@ class AgentConfig(abc.ABC, pydantic.BaseModel):
           enabled_tools=types.BuiltinTools.read_only()
       )
   )
-  tools: list[Callable[..., Any]] = pydantic.Field(default_factory=list)
+  tools: list[Callable[..., Any] | str] = pydantic.Field(default_factory=list)
   policies: list[policy.Policy] = pydantic.Field(default_factory=list)
   hooks: list[hooks_mod.Hook] = pydantic.Field(default_factory=list)
   triggers: list[triggers_mod.Trigger] = pydantic.Field(default_factory=list)
@@ -176,6 +176,37 @@ class AgentConfig(abc.ABC, pydantic.BaseModel):
       copied.triggers = list(self.triggers)
       copied.policies = list(self.policies)
     return copied
+
+  def _get_all_custom_tools(self) -> list[Callable[..., Any]]:
+    """Returns all callable custom tools across the main agent and subagents."""
+    tools: list[Callable[..., Any]] = []
+    seen_names: dict[str, Callable[..., Any]] = {}
+    for t in self.tools or []:
+      if callable(t):
+        name = getattr(t, "__name__", None) or type(t).__name__
+        if name in seen_names:
+          if seen_names[name] != t:
+            raise ValueError(
+                f"Duplicate custom tool name '{name}' detected across agent"
+                " and subagent configurations."
+            )
+        else:
+          seen_names[name] = t
+          tools.append(t)
+    for sub in self.subagents or []:
+      for tool in sub.tools or []:
+        if callable(tool):
+          name = getattr(tool, "__name__", None) or type(tool).__name__
+          if name in seen_names:
+            if seen_names[name] != tool:
+              raise ValueError(
+                  f"Duplicate custom tool name '{name}' detected across agent"
+                  f" and subagent '{sub.name}' configurations."
+              )
+          else:
+            seen_names[name] = tool
+            tools.append(tool)
+    return tools
 
   @abc.abstractmethod
   def create_strategy(

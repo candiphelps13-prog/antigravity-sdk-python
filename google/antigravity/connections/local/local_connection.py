@@ -18,6 +18,7 @@ import asyncio
 import collections
 import importlib.metadata
 import importlib.resources
+import inspect
 import json
 import logging
 import os
@@ -227,10 +228,25 @@ def callable_to_tool_proto(
 
   # Use the ToolRunner's public callable to strip injectable params.
   target_fn = fn
-  if tool_runner is not None:
-    tool_name = getattr(fn, "__name__", "")
-    if tool_name in tool_runner.tools:
-      target_fn = tool_runner.get_public_callable(tool_name)
+  tool_name = getattr(fn, "__name__", None) or type(fn).__name__
+  if tool_runner is not None and tool_name in tool_runner.tools:
+    target_fn = tool_runner.get_public_callable(tool_name)
+
+  if not hasattr(target_fn, "__name__"):
+    orig_fn = target_fn
+
+    def wrapped(*args, **kwargs):
+      return orig_fn(*args, **kwargs)
+
+    wrapped.__name__ = tool_name
+    setattr(wrapped, "__doc__", getattr(orig_fn, "__doc__", None))
+    try:
+      setattr(wrapped, "__signature__", inspect.signature(orig_fn))
+    except (ValueError, TypeError):
+      setattr(
+          wrapped, "__annotations__", getattr(orig_fn, "__annotations__", {})
+      )
+    target_fn = wrapped
 
   decl = genai_types.FunctionDeclaration.from_callable_with_api_option(
       callable=target_fn,
@@ -799,6 +815,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       retry_config: types.RetryConfig | None = None,
       budget_config: types.BudgetConfig | None = None,
       policies: list[policy.Policy] | None = None,
+      tools: Sequence[Callable[..., Any] | str] | None = None,
   ):
     """Initializes the instance.
 
@@ -821,10 +838,12 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       retry_config: Optional retry configuration for model API and outputs.
       budget_config: Optional session budget configuration.
       policies: Optional list of policy rules for the Go evaluator.
+      tools: Optional list of tools for the root agent.
     """
     self._binary_path = _get_default_binary_path(env)
     self._tool_runner = tool_runner
     self._hook_runner = hook_runner
+    self._tools = tools
     self._connection: LocalConnection | None = None
     self._mcp_servers = mcp_servers or []
     self._models: list[types.ModelTarget] = models or []
@@ -972,7 +991,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
 
   def _build_custom_subagents_protos(
       self,
-      main_agent_tool_protos: dict[str, localharness_pb2.Tool],
+      all_tool_protos: dict[str, localharness_pb2.Tool],
   ) -> list[localharness_pb2.CustomAgent]:
     """Resolves and builds CustomAgent configuration protos for subagents."""
     custom_agents_protos = []
@@ -985,22 +1004,19 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
       for tool in subagent.tools or []:
         if isinstance(tool, str):
           name = tool
+          if name in all_tool_protos:
+            resolved_subagent_tools.append(all_tool_protos[name])
+          else:
+            resolved_subagent_tools.append(localharness_pb2.Tool(name=name))
+        elif callable(tool):
+          proto = callable_to_tool_proto(tool, tool_runner=self._tool_runner)
+          all_tool_protos[proto.name] = proto
+          resolved_subagent_tools.append(proto)
         else:
-          name = getattr(tool, "__name__", None)
-          if name is None:
-            raise ValueError(
-                f"Invalid tool type in subagent '{subagent.name}' tools list:"
-                f" {tool}"
-            )
-
-        if name not in main_agent_tool_protos:
           raise ValueError(
-              f"Subagent tool '{name}' is not registered on the main agent"
-              " config. Any custom tools used by subagents must also be added"
-              " to the main agent's tools list."
+              f"Invalid tool type in subagent '{subagent.name}' tools list:"
+              f" {tool}"
           )
-
-        resolved_subagent_tools.append(main_agent_tool_protos[name])
 
       custom_agents_protos.append(
           localharness_pb2.CustomAgent(
@@ -1022,11 +1038,42 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
 
   def _build_harness_config(self) -> localharness_pb2.HarnessConfig:
     """Translates Pydantic config objects into a HarnessConfig proto."""
-    main_agent_tool_protos = {}
+    all_tool_protos = {}
     if self._tool_runner:
       for fn in self._tool_runner.tools.values():
         proto = callable_to_tool_proto(fn, tool_runner=self._tool_runner)
-        main_agent_tool_protos[proto.name] = proto
+        all_tool_protos[proto.name] = proto
+
+    root_tool_protos = []
+    if self._tools is not None:
+      for tool in self._tools:
+        if isinstance(tool, str):
+          if tool in all_tool_protos:
+            root_tool_protos.append(all_tool_protos[tool])
+          else:
+            root_tool_protos.append(localharness_pb2.Tool(name=tool))
+        elif callable(tool):
+          proto = callable_to_tool_proto(tool, tool_runner=self._tool_runner)
+          all_tool_protos[proto.name] = proto
+          root_tool_protos.append(proto)
+    elif self._tool_runner:
+      # Fallback when _tools is not explicitly specified: exclude tools
+      # exclusive to subagents.
+      subagent_tool_names = set()
+      for sa in self._subagents:
+        for t in sa.tools or []:
+          if isinstance(t, str):
+            subagent_tool_names.add(t)
+          elif callable(t):
+            subagent_proto = callable_to_tool_proto(
+                t, tool_runner=self._tool_runner
+            )
+            subagent_tool_names.add(subagent_proto.name)
+      root_tool_protos = [
+          proto
+          for name, proto in all_tool_protos.items()
+          if name not in subagent_tool_names
+      ]
 
     system_instructions_proto = self._to_system_instructions_proto(
         self._system_instructions
@@ -1054,11 +1101,9 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
 
     enabled_hooks = self._get_enabled_hooks()
 
-    custom_agents_protos = self._build_custom_subagents_protos(
-        main_agent_tool_protos
-    )
+    custom_agents_protos = self._build_custom_subagents_protos(all_tool_protos)
     harness_config = localharness_pb2.HarnessConfig(
-        tools=list(main_agent_tool_protos.values()),
+        tools=root_tool_protos,
         system_instructions=system_instructions_proto,
         cascade_id=self._conversation_id or "",
         session_continuation_mode=to_proto_session_continuation_mode(

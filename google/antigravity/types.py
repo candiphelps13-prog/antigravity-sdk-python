@@ -262,16 +262,16 @@ class SubagentConfig(pydantic.BaseModel):
     capabilities: Optional capabilities config controlling allowed tools. If
       None, defaults to read-only tools.
     tools: Optional list of additional custom tools (callable functions or
-      string names) to enable. Any custom Python tools used by subagents must
-      also be added to the main agent's tools list in order to be available to
-      the subagent during execution.
+      string names) to enable for this subagent.
   """
 
   name: str
   description: str
   system_instructions: str | SystemInstructions | None = None
   capabilities: SubagentCapabilities | None = None
-  tools: list[Callable[..., Any] | str] = pydantic.Field(default_factory=list)
+  tools: list[Callable[..., Any] | str] | None = pydantic.Field(
+      default_factory=list
+  )
 
 
 class BuiltinTools(str, enum.Enum):

@@ -148,6 +148,112 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
       "local.local_connection.LocalConnectionStrategy"
   )
   @mock.patch.object(conversation.Conversation, "create")
+  async def test_agent_collects_subagent_custom_tools_into_tool_runner(
+      self, mock_conv_create, mock_strategy_class
+  ):
+    del mock_conv_create
+    mock_strategy_instance = mock.MagicMock()
+    mock_strategy_instance.stop = mock.AsyncMock()
+    mock_strategy_class.return_value = mock_strategy_instance
+
+    def root_tool():
+      """Root tool."""
+
+    def sub_tool():
+      """Subagent tool."""
+
+    config = local_connection.LocalAgentConfig(
+        system_instructions="test",
+        tools=[root_tool],
+        subagents=[
+            types.SubagentConfig(
+                name="helper",
+                description="helper",
+                tools=[sub_tool],
+            )
+        ],
+    )
+    async with agent.Agent(config) as ag:
+      self.assertIsNotNone(ag._tool_runner)
+      self.assertIn("root_tool", ag._tool_runner.tools)
+      self.assertIn("sub_tool", ag._tool_runner.tools)
+
+  def test_agent_config_get_all_custom_tools_guards_none_and_deduplicates(self):
+    # Test None guards return empty list
+    empty_config = local_connection.LocalAgentConfig(tools=None, subagents=None)
+    self.assertEqual(empty_config._get_all_custom_tools(), [])
+
+    # Test subagents with None tools returns empty list
+    sub_none_tools_config = local_connection.LocalAgentConfig(
+        tools=None,
+        subagents=[
+            types.SubagentConfig(name="sub", description="sub", tools=None)
+        ],
+    )
+    self.assertEqual(sub_none_tools_config._get_all_custom_tools(), [])
+
+    # Test filtering out string tools and preserving callables
+    def shared_tool():
+      """Shared tool."""
+
+    def sub_only_tool():
+      """Sub only tool."""
+
+    config = local_connection.LocalAgentConfig(
+        tools=[shared_tool, "view_file"],
+        subagents=[
+            types.SubagentConfig(
+                name="sub1",
+                description="sub1",
+                tools=[shared_tool, sub_only_tool, "grep_search"],
+            ),
+            types.SubagentConfig(
+                name="sub2",
+                description="sub2",
+                tools=[sub_only_tool],
+            ),
+        ],
+    )
+    all_tools = config._get_all_custom_tools()
+    self.assertEqual(len(all_tools), 2)
+    self.assertIn(shared_tool, all_tools)
+    self.assertIn(sub_only_tool, all_tools)
+
+  def test_agent_config_get_all_custom_tools_raises_on_name_collision(self):
+    def tool_fn():
+      """Root tool."""
+
+    # Define a distinct function object with the exact same name
+    def make_conflicting_tool():
+      def tool_fn():
+        """Conflicting sub tool."""
+
+      return tool_fn
+
+    conflicting_tool = make_conflicting_tool()
+
+    config = local_connection.LocalAgentConfig(
+        tools=[tool_fn],
+        subagents=[
+            types.SubagentConfig(
+                name="sub1",
+                description="sub1",
+                tools=[conflicting_tool],
+            ),
+        ],
+    )
+    with self.assertRaisesRegex(
+        ValueError,
+        "Duplicate custom tool name 'tool_fn' detected across agent and"
+        " subagent 'sub1' configurations.",
+    ):
+      config._get_all_custom_tools()
+
+  @mock.patch(
+      "google.antigravity.connections."
+      "local.local_connection.LocalConnectionStrategy"
+  )
+  @mock.patch.object(conversation.Conversation, "create")
   async def test_agent_default_capabilities(
       self, mock_conv_create, mock_strategy_class
   ):
@@ -472,8 +578,6 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
 
     # TriggerRunner.stop() called during __aexit__.
     mock_runner_instance.stop.assert_called_once()
-
-
 
   @mock.patch(
       "google.antigravity.connections."
