@@ -40,8 +40,8 @@ from google.antigravity import Agent
 from google.antigravity import LocalAgentConfig
 from google.antigravity import types
 from google.antigravity.hooks import policy
-from google.antigravity.utils import interactive
-from google.antigravity.utils.interactive import async_input
+from google.antigravity.utils import interactive  # pyrefly: ignore[missing-module-attribute]
+from google.antigravity.utils.interactive import async_input  # pyrefly: ignore[missing-import]
 
 _MODEL_NAME = flags.DEFINE_string(
     "model_name", "gemini-3.7-flash", "Gemini model name."

@@ -31,7 +31,7 @@ import sys
 
 from google.antigravity import Agent
 from google.antigravity import LocalAgentConfig
-from google.antigravity.utils import interactive
+from google.antigravity.utils import interactive  # pyrefly: ignore[missing-module-attribute]
 
 
 async def main() -> None:
