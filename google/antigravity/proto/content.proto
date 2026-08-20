@@ -149,6 +149,7 @@ message VideoContent {
     TYPE_WMV = 8;
     TYPE_3GPP = 9;
     TYPE_YT_BEYOND = 10;
+    TYPE_JPEG2000 = 11;
   }
   enum Processing {
     PROCESSING_UNSPECIFIED = 0;
