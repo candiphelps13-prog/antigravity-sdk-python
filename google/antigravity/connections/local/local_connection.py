@@ -41,6 +41,7 @@ from google.antigravity.proto import localharness_pb2
 from google.antigravity import types
 from google.antigravity.connections import connection
 from google.antigravity.connections.local import event_processor
+from google.antigravity.connections.local import local_connection_config
 from google.antigravity.hooks import hook_runner as h_runner
 from google.antigravity.hooks import policy
 from google.antigravity.tools import tool_runner as t_runner
@@ -870,9 +871,9 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
     self._conversation_id = conversation_id
     self._session_continuation_mode = session_continuation_mode
     self._save_dir = save_dir
-    self._workspaces = [
-        event_processor.normalize_wire_path(ws) for ws in workspaces or []
-    ]
+    self._workspaces = local_connection_config.normalize_workspace_paths(
+        workspaces
+    )
     self._app_data_dir = app_data_dir
     self._subagents = subagents or []
 

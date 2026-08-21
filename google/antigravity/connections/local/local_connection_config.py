@@ -84,6 +84,41 @@ def normalize_wire_path(path: str) -> str:
   return path
 
 
+def normalize_workspace_path(path: str | os.PathLike[str]) -> str:
+  """Normalizes wire URIs, expands user home ~, and resolves relative paths."""
+  path_str = os.fspath(path)
+  if not path_str:
+    return ""
+  normalized = normalize_wire_path(path_str)
+  if normalized.startswith("/cns/"):
+    return normalized
+  parsed = urllib.parse.urlparse(normalized)
+  if not parsed.scheme or parsed.scheme == "file":
+    return str(pathlib.Path(normalized).expanduser().resolve())
+  return normalized
+
+
+def normalize_workspace_paths(
+    workspaces: (
+        Sequence[str | os.PathLike[str]] | str | os.PathLike[str] | None
+    ),
+    *,
+    default_to_cwd: bool = False,
+) -> list[str]:
+  """Coerces single/sequence workspace paths and normalizes each entry."""
+  if workspaces is None:
+    return [os.getcwd()] if default_to_cwd else []
+  if isinstance(workspaces, (str, os.PathLike)):
+    return [normalize_workspace_path(workspaces)]
+  if isinstance(workspaces, (list, tuple, Sequence)) and not isinstance(
+      workspaces, (str, bytes)
+  ):
+    return [normalize_workspace_path(ws) for ws in workspaces]
+  raise ValueError(
+      f"workspaces must be a sequence of paths, got {type(workspaces).__name__}"
+  )
+
+
 def make_step_id(trajectory_id: str, step_index: int) -> str:
   """Creates a unique step identifier from trajectory ID and step index."""
   return f"{trajectory_id}:{step_index}" if trajectory_id else str(step_index)
@@ -110,6 +145,11 @@ class BaseLocalAgentConfig(connection.AgentConfig):
       ),
   )
   workspaces: list[str] = pydantic.Field(default_factory=lambda: [os.getcwd()])
+
+  @pydantic.field_validator("workspaces", mode="before")
+  @classmethod
+  def _validate_workspaces(cls, v: Any) -> list[str]:
+    return normalize_workspace_paths(v, default_to_cwd=True)
 
   @pydantic.field_validator("app_data_dir")
   def _validate_app_data_dir(cls, v: str | None) -> str | None:  # pylint: disable=no-self-argument

@@ -24,6 +24,7 @@ import pathlib
 import struct
 import subprocess
 import tempfile
+import typing
 import unittest
 from unittest import mock
 
@@ -2100,7 +2101,121 @@ class LocalConnectionStrategyConfigTest(parameterized.TestCase):
         workspaces=["file:///dev/shm/workspace", "/tmp/clean-path"]
     )
     self.assertEqual(
-        strategy._workspaces, ["/dev/shm/workspace", "/tmp/clean-path"]
+        strategy._workspaces,
+        ["/dev/shm/workspace", str(pathlib.Path("/tmp/clean-path").resolve())],
+    )
+
+  def test_strategy_normalizes_relative_workspaces(self):
+    """Verifies that relative workspace paths and user home ~ are resolved."""
+    strategy = self._make_strategy(
+        workspaces=["ws", "./subdir", "../parent", "~/my_project"]
+    )
+    expected = [
+        str(pathlib.Path("ws").resolve()),
+        str(pathlib.Path("./subdir").resolve()),
+        str(pathlib.Path("../parent").resolve()),
+        str(pathlib.Path("~/my_project").expanduser().resolve()),
+    ]
+    self.assertEqual(strategy._workspaces, expected)
+    config = strategy._build_harness_config()
+    self.assertLen(config.workspaces, 4)
+    for i, exp in enumerate(expected):
+      self.assertEqual(config.workspaces[i].filesystem_workspace.directory, exp)
+
+  def test_strategy_normalizes_pathlib_paths(self):
+    """Verifies that pathlib.Path objects are resolved and accepted."""
+    strategy = self._make_strategy(
+        workspaces=[pathlib.Path("ws"), pathlib.Path("/dev/shm/ws")]
+    )
+    expected = [
+        str(pathlib.Path("ws").resolve()),
+        str(pathlib.Path("/dev/shm/ws").resolve()),
+    ]
+    self.assertEqual(strategy._workspaces, expected)
+
+  def test_strategy_normalizes_cns_workspaces(self):
+    """Verifies that CNS URIs and paths are preserved without filesystem resolve."""
+    strategy = self._make_strategy(
+        workspaces=["cns://el-d/home/user/project", "/cns/el-d/home/user/data"]
+    )
+    expected = [
+        "/cns/el-d/home/user/project",
+        "/cns/el-d/home/user/data",
+    ]
+    self.assertEqual(strategy._workspaces, expected)
+    config = strategy._build_harness_config()
+    self.assertEqual(
+        config.workspaces[0].filesystem_workspace.directory,
+        "/cns/el-d/home/user/project",
+    )
+    self.assertEqual(
+        config.workspaces[1].filesystem_workspace.directory,
+        "/cns/el-d/home/user/data",
+    )
+
+  def test_local_agent_config_workspaces_validation(self):
+    """Verifies LocalAgentConfig validation, coercion, and normalization of workspaces."""
+    # Default is [os.getcwd()]
+    cfg_default = local_connection_config.LocalAgentConfig()
+    self.assertEqual(cfg_default.workspaces, [os.getcwd()])
+
+    # Explicit empty list is preserved
+    cfg_empty = local_connection_config.LocalAgentConfig(workspaces=[])
+    self.assertEqual(cfg_empty.workspaces, [])
+
+    # Single string is coerced and normalized
+    cfg_str = local_connection_config.LocalAgentConfig(workspaces="ws")
+    self.assertEqual(cfg_str.workspaces, [str(pathlib.Path("ws").resolve())])
+
+    # Single Path is coerced and normalized
+    cfg_path = local_connection_config.LocalAgentConfig(
+        workspaces=pathlib.Path("ws")
+    )
+    self.assertEqual(cfg_path.workspaces, [str(pathlib.Path("ws").resolve())])
+
+    # List of relative paths and ~
+    cfg_list = local_connection_config.LocalAgentConfig(
+        workspaces=["ws", "./nested", "~/my_project"]
+    )
+    self.assertEqual(
+        cfg_list.workspaces,
+        [
+            str(pathlib.Path("ws").resolve()),
+            str(pathlib.Path("./nested").resolve()),
+            str(pathlib.Path("~/my_project").expanduser().resolve()),
+        ],
+    )
+
+    # URIs
+    cfg_uris = local_connection_config.LocalAgentConfig(
+        workspaces=["file:///dev/shm/ws", "cns://el-d/home/user/ws"]
+    )
+    self.assertEqual(
+        cfg_uris.workspaces,
+        ["/dev/shm/ws", "/cns/el-d/home/user/ws"],
+    )
+
+    # Invalid types raise ValidationError
+    with self.assertRaises(pydantic.ValidationError):
+      local_connection_config.LocalAgentConfig(
+          workspaces=typing.cast(typing.Any, 123)
+      )
+
+    with self.assertRaises(pydantic.ValidationError):
+      local_connection_config.LocalAgentConfig(
+          workspaces=typing.cast(typing.Any, {"invalid": "type"})
+      )
+
+  def test_strategy_normalizes_single_workspace_input(self):
+    """Verifies that a single string or PathLike passed to strategy is normalized."""
+    strategy_str = self._make_strategy(workspaces="ws")
+    self.assertEqual(
+        strategy_str._workspaces, [str(pathlib.Path("ws").resolve())]
+    )
+
+    strategy_path = self._make_strategy(workspaces=pathlib.Path("ws"))
+    self.assertEqual(
+        strategy_path._workspaces, [str(pathlib.Path("ws").resolve())]
     )
 
   def test_mcp_servers_propagated(self):
