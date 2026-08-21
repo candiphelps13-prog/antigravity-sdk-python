@@ -44,12 +44,36 @@ message GenerationConfig {
   .genai.SpeakerConfig structured_speech_config = 27
       [(gaos.parsing.add_union_value) = "structured_speech_config.speakers"];
 }
-message TranscriptionConfig {
+message VerbatimTranscriptionMode {
   repeated string timestamp_granularities = 1;
   string diarization_mode = 2;
+}
+message SmartTranscriptionMode {}
+message TranscriptionMode {
+  oneof type {
+    option (gaos.parsing.subtype_source) = true;
+
+    .genai.VerbatimTranscriptionMode verbatim = 1;
+    .genai.SmartTranscriptionMode smart = 2;
+  }
+}
+message TranscriptionConfig {
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    VERBATIM = 1;
+    SMART = 2;
+  }
+  oneof mode {
+    option (gaos.parsing.is_union) = true;
+
+    .genai.TranscriptionConfig.Mode mode_enum = 6;
+    .genai.TranscriptionMode mode_config = 9;
+  }
   repeated string language_codes = 3;
-  repeated string adaptation_phrases = 4;
   repeated string custom_vocabulary = 5;
+  repeated string timestamp_granularities = 1;
+  string diarization_mode = 2;
+  repeated string adaptation_phrases = 4;
 }
 message SpeakerConfig {
   repeated .genai.SpeechConfig speakers = 1;
