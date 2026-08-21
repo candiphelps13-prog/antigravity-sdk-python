@@ -282,6 +282,19 @@ def _sanitize_prompt(text: str) -> str:
   return sanitized
 
 
+def _get_ws_close_code(e: websockets.ConnectionClosed) -> int | str | None:
+  """Safely retrieves the WebSocket close code across websockets library versions."""
+  rcvd = getattr(e, "rcvd", None)
+  if rcvd is not None and hasattr(rcvd, "code"):
+    return rcvd.code
+  sent = getattr(e, "sent", None)
+  if sent is not None and hasattr(sent, "code"):
+    return sent.code
+  if rcvd is None and sent is None:
+    return 1006
+  return getattr(e, "code", None)
+
+
 class LocalConnection(connection.Connection):
   """Connection to the Go-based local harness."""
 
@@ -540,14 +553,15 @@ class LocalConnection(connection.Connection):
         json_format.Parse(raw_msg, event)
         await self._processor.process_event(event)
     except websockets.ConnectionClosed as e:
+      close_code = _get_ws_close_code(e)
       if self._disconnecting:
         # Expected closure.
-        logging.info("WebSocket closed (code %s); normal shutdown.", e.code)
+        logging.info("WebSocket closed (code %s); normal shutdown.", close_code)
       else:
         # Unexpected closure.
         stderr_tail = "\n".join(self._stderr_lines) or "(no stderr output)"
         error_msg = (
-            f"Harness process exited unexpectedly (WS close code {e.code})."
+            f"Harness process exited unexpectedly (WS close code {close_code})."
             f"\nHarness stderr:\n{stderr_tail}"
         )
         logging.error(error_msg)

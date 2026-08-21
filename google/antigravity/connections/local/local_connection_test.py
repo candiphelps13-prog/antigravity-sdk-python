@@ -3850,6 +3850,31 @@ class LocalConnectionUnexpectedCloseTest(unittest.IsolatedAsyncioTestCase):
     item = await asyncio.wait_for(conn._step_queue.get(), timeout=2)
     self.assertIsNone(item)
 
+  def test_get_ws_close_code_with_rcvd_code(self):
+    """Verifies close code extraction when rcvd has a code."""
+    rcvd_frame = mock.MagicMock(code=1000)
+    exc = websockets.ConnectionClosed(rcvd=rcvd_frame, sent=None)
+    self.assertEqual(local_connection._get_ws_close_code(exc), 1000)
+
+  def test_get_ws_close_code_with_sent_code(self):
+    """Verifies close code extraction when sent has a code."""
+    sent_frame = mock.MagicMock(code=1001)
+    exc = websockets.ConnectionClosed(rcvd=None, sent=sent_frame)
+    self.assertEqual(local_connection._get_ws_close_code(exc), 1001)
+
+  def test_get_ws_close_code_with_both_none(self):
+    """Verifies close code defaults to 1006 when both rcvd and sent are None."""
+    exc = websockets.ConnectionClosed(rcvd=None, sent=None)
+    self.assertEqual(local_connection._get_ws_close_code(exc), 1006)
+
+  def test_get_ws_close_code_fallback_to_code_attr(self):
+    """Verifies fallback to code attribute if rcvd/sent are not None but have no code attribute."""
+    exc = mock.MagicMock(spec=websockets.ConnectionClosed)
+    exc.rcvd = "invalid_rcvd_no_code"
+    exc.sent = "invalid_sent_no_code"
+    exc.code = 1008
+    self.assertEqual(local_connection._get_ws_close_code(exc), 1008)
+
 
 class LocalConnectionSendTest(unittest.IsolatedAsyncioTestCase):
   """Validates multi-modal coercion and InputEvent serialization inside LocalConnection.send()."""

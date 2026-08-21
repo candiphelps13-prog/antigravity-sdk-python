@@ -17,21 +17,36 @@
 import asyncio
 import unittest
 
-from opentelemetry import trace
-from opentelemetry.sdk import trace as sdk_trace
-from opentelemetry.sdk.trace import export as sdk_trace_export
-from opentelemetry.sdk.trace.export import in_memory_span_exporter
-from opentelemetry.util import _once as otel_once
-
 from google.antigravity import types
 from google.antigravity.hooks import hooks as hooks_base
-from google.antigravity.utils import otel as otel_hooks
+
+# pylint: disable=g-import-not-at-top
+try:
+  import pytest
+  pytest.importorskip("opentelemetry.sdk")
+except ImportError:
+  pass
+
+try:
+  from opentelemetry import trace
+  from opentelemetry.sdk import trace as sdk_trace
+  from opentelemetry.sdk.trace import export as sdk_trace_export
+  from opentelemetry.sdk.trace.export import in_memory_span_exporter
+  from opentelemetry.util import _once as otel_once
+  from google.antigravity.utils import otel as otel_hooks
+  _OTEL_AVAILABLE = True
+except ImportError:
+  _OTEL_AVAILABLE = False
+# pylint: enable=g-import-not-at-top
 
 
 class DummyStep(types.Step):
   trajectory_id: str = ""
 
 
+@unittest.skipIf(
+    not _OTEL_AVAILABLE, "opentelemetry-sdk optional dependency not installed"
+)
 class OtelHooksTest(unittest.IsolatedAsyncioTestCase):
   """Tests tracing context propagation across turns and interleaved steps."""
 

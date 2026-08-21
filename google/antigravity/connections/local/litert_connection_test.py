@@ -656,7 +656,10 @@ class LiteRTConnectionTest(unittest.IsolatedAsyncioTestCase):
 
   def test_litert_logging_defaults_to_silent(self):
     """Verify LiteRT logging defaults to SILENT (non-verbose)."""
-    with mock.patch.object(litert_connection, "litert_lm") as mock_litert_lm:
+    with (
+        mock.patch.object(litert_connection, "litert_lm") as mock_litert_lm,
+        mock.patch.object(logging.Logger, "isEnabledFor", return_value=False),
+    ):
       mock_litert_lm.LogSeverity.SILENT = 1000
       mock_litert_lm.set_min_log_severity = mock.MagicMock()
       config = litert_connection_config.LiteRTAgentConfig(
@@ -667,6 +670,29 @@ class LiteRTConnectionTest(unittest.IsolatedAsyncioTestCase):
           hook_runner=mock.MagicMock(),
       )
       mock_litert_lm.set_min_log_severity.assert_called_with(1000)
+
+  def test_litert_logging_defaults_to_silent_with_ambient_debug_logger(self):
+    """Verify LiteRT logging is SILENT when debug check is isolated despite ambient debug loggers."""
+    root_logger = logging.getLogger()
+    old_level = root_logger.level
+    try:
+      root_logger.setLevel(logging.DEBUG)
+      with (
+          mock.patch.object(litert_connection, "litert_lm") as mock_litert_lm,
+          mock.patch.object(logging.Logger, "isEnabledFor", return_value=False),
+      ):
+        mock_litert_lm.LogSeverity.SILENT = 1000
+        mock_litert_lm.set_min_log_severity = mock.MagicMock()
+        config = litert_connection_config.LiteRTAgentConfig(
+            model_path="/tmp/model.litertlm",
+        )
+        config.create_strategy(
+            tool_runner=mock.MagicMock(),
+            hook_runner=mock.MagicMock(),
+        )
+        mock_litert_lm.set_min_log_severity.assert_called_with(1000)
+    finally:
+      root_logger.setLevel(old_level)
 
   def test_litert_logging_verbose_when_debug_enabled(self):
     """Verify LiteRT log severity is VERBOSE when Python debug logging is enabled."""
