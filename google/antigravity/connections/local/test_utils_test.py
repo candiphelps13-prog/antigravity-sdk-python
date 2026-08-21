@@ -156,7 +156,8 @@ class PatchDefaultBinaryPathTest(unittest.TestCase):
         self, return_value="/custom/test/binary"
     )
     self.assertEqual(
-        local_connection._get_default_binary_path(), "/custom/test/binary"
+        local_connection._get_default_binary_path(env=None),
+        "/custom/test/binary",
     )
 
 
