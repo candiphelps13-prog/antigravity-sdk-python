@@ -7,6 +7,13 @@ All notable changes to the Google Antigravity Python SDK will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.14] - 2026-08-21
+
+Bug fixes:
+- https://github.com/google-antigravity/antigravity-sdk-python/issues/183
+- https://github.com/google-antigravity/antigravity-sdk-python/issues/181
+- https://github.com/google-antigravity/antigravity-sdk-python/issues/167
+
 ## [0.1.13] - 2026-08-18
 
 This release introduces pre-tool argument modification capabilities in lifecycle hooks, adds native support for synchronous hook functions, and establishes structured command execution configuration with configurable execution timeouts. It also improves tool execution observability with step correlation IDs, and enhances connection resilience during client disconnects.
